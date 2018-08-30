@@ -1,0 +1,188 @@
+---
+title: "Data Science for Bioinformatics - Week 01"
+author: "Palle Villesen Not"
+date: "August 32, 2318"
+output:
+  pdf_document: default
+  html_document:
+    theme: readable
+---
+
+
+#### R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. 
+
+#### Q: Try and knit this this document now!
+
+Press the "knit button" or press ctrl+shift+k
+
+#### A little more on R markdown
+
+You can embed an R code chunk like this:
+
+```{r cars}
+
+summary(cars)
+
+```
+
+You insert these chunks of code by pressing ctrl+alt+i or by the >Code>Insert chunk menu 
+
+#### Q: Insert a chunk of code that uses the head() function to inspect the cars dataset
+
+
+
+
+
+#### Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure}
+
+plot(pressure) # sad, no colors
+
+```
+
+### R for data science exercises: Data visualization
+
+First you should work through two online tutorials that will introduce you to ggplot2
+
+Either you can do all the exercises in this document (to save your answers) or a new one.
+
+The tutorial is from the free book "R for data science" written by the R Overlord Hadley Wickham
+
+URL: http://r4ds.had.co.nz/index.html
+
+ - Read Welcome  
+ - Read 1. Introduction  
+ - Read 2. Introduction  
+ - Go through 3. Data visualization (this takes some time but will introduce you to ggplot2)  
+ - Read 27. Rmarkdown  
+ 
+
+#### Real data
+
+```{r}
+
+# install.packages("tidyverse") 
+library(tidyverse)
+
+```
+
+#### By using the knowledge from above we will now work on a dataset
+
+We first load the dataset into a variable we call "mammals"
+
+```{r}
+
+library(tidyverse)
+
+mammals = read_csv(file = "../datasets/dataset.01.rsbl20150010supp1.csv")
+
+```
+
+#### Q: Use dim(), names(), head() and summary() to inspect the dataset
+```{r}
+mammals %>% dim()
+mammals %>% names()
+mammals %>% summary()
+```
+
+
+How many rows and columns are in the dataset?
+12
+
+Which columns are text?
+gene             Species              labs             chrMark              chr?     chrtype
+
+Which columns are numbers?
+dN                dS               dNdS              RPKM                Tau        GC3
+
+#### Identify how each column of the data corresponds to the variables described in the methods section of the paper 
+
+  1.Expression Level  ---------> RPKM  
+  2.Expression specificity  ---> Tau  
+  3.GC content 3rd position   -> GC3  
+  4.Species   -----------------> Species  
+  5.dN/dS   -------------------> dNdS  
+  6.Chromosome type   ---------> chrMark    
+
+#### Hint for keeping and saving a plot
+
+```{r}
+
+plotdata = data.frame(x=rnorm(100), y=rnorm(100), type=sample(x = 1:3, size = 100, replace = T))
+
+plot1    = ggplot(data = plotdata) + 
+  geom_point(mapping = aes(x = x, y = y, color=type))
+
+plot(plot1)
+
+ggsave(filename = "plot.week.01.first.plot.png", plot = plot1)
+ggsave(filename = "plot.week.01.first.plot.pdf", plot = plot1)
+
+```
+
+#### Q: Vizualize the distribution of gene expression for all species
+
+So basically, make a new code chunk and make a plot that shows the distribution of RPKM for all species in the same plot.
+
+
+```{r}
+plotden1 = ggplot(mammals, aes(x = mammals$RPKM)) + geom_density(fill = "cornflowerblue")
+plotden1
+```
+
+#### Q: Vizualize the distribution of gene expression for all species on a log scale
+```{r}
+plotden1 + scale_x_log10() + labs(title = "Density of expression", x = "protein expression (RPKM)")
+```
+
+HINT: ?scale_x_log10()
+
+
+#### A little trick to distinguish chromosome X from the other chromosomes (more on this later in the course)
+
+We use a little simple trick to make a new variable that tells you if the chromosome is an autosome or sex chromosome.
+
+```{r}
+
+mammals = mammals %>%
+  mutate(chrtype =  ifelse(chr!="X", "Autosome", "Chromosome X")) %>%
+  arrange(chrtype) %>% 
+  {.} #???
+
+head(mammals)
+
+```
+
+
+#### Q: Vizualize the distribution of gene expression for all species on a log scale, but plot each species in its own subplot
+
+```{r}
+ggplot(mammals, aes(x = RPKM)) + scale_x_log10() + geom_density(aes(color = chrtype)) + facet_grid(Species~.) + labs(title ="Density comparison", x = "protein expression (RPKM)")
+```
+
+
+HINT: ?facet_grid  
+HINT: ?facet_wrap  
+```{r}
+?facet_wrap
+```
+
+
+
+
+#### Q: do a scatter plot of gene expression (log scale) against dNdS, color by chromosome type, facet by species
+
+```{r}
+ggplot(mammals, aes(x = RPKM, y = dNdS, color = chrtype)) + geom_point(size = 0.3) + scale_x_log10() + facet_wrap(~Species) + ggtitle("Scatterplot")
+```
+
+
+
+
