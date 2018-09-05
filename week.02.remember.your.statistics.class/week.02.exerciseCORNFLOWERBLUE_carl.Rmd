@@ -1,0 +1,65 @@
+---
+title: "Data Science for Bioinformatics - Week 02"
+author: "Palle Villesen"
+date: "August 14, 2018"
+output:
+  html_document:
+        theme: readable
+---
+
+
+### R for data science exercises #### 
+
+Either you can do all the exercises in this document (to save your answers) or a new one.
+
+The tutorial is from the free book "R for data science" written by the R Overlord Hadley Wickham
+
+URL: http://r4ds.had.co.nz/index.html
+
+ - Go through 4.    
+ - Go through 5.   
+
+
+#### Work on the mammals dataset (like last week)
+
+
+```{r}
+
+library(tidyverse)
+mammals = read_csv(file = "../datasets/dataset.01.rsbl20150010supp1.csv")
+
+```
+
+# Gene expression in the mammals dataset
+
+#### Q: Make a new variable called "expression" that is the log10(RPKM+1)
+
+
+```{r}
+
+
+```
+
+
+#### Q: What is the overall distribution of the expression? (make a histogram)
+
+
+```{r}
+
+
+```
+
+#### Q: What is the overall distribution of the expression but for each species separatedly?
+
+```{r}
+
+
+```
+
+#### Q: What is the mean, median and stadard deviation of the expression for each Species?
+
+```{r}
+
+
+```
+
