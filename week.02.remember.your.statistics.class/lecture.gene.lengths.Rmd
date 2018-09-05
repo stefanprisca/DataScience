@@ -1,0 +1,215 @@
+---
+title: "Gene lengths"
+author: "Palle Villesen"
+output:
+  html_document:
+    theme: readable
+---
+
+
+```{r cache=FALSE}
+
+library(tidyverse)
+
+theme_palle <- function (base_size = 12, base_family = "sans") {
+  theme_minimal(base_size = base_size, base_family = base_family) %+replace% 
+  theme(line = element_line(colour = "black", size = 0.3, linetype = 1, lineend = "square"),
+        rect = element_rect(fill = NA, colour = "black", size = 0.3, linetype = 1), 
+        text = element_text(family = base_family, face = "plain", colour = "black", size = base_size, 
+                            lineheight = 0.9, hjust = 0.5, vjust = 0.5, angle = 0, margin = margin(), debug = FALSE),
+        title = NULL,
+        #axis.line = element_line(colour = "black", size = 0.3, linetype = 1, lineend = "square"),
+
+        #axis.text = element_text(family = base_family, face = "plain", colour = "black", size = base_size, 
+        #                         lineheight = 0.9, hjust = 0.5, vjust = 0.5, angle = 0, margin = margin(), debug = FALSE),
+        axis.title = NULL, 
+        axis.line  = NULL,
+        axis.ticks = NULL,
+        axis.text  = NULL,
+        strip.text = NULL, 
+        legend.text	= NULL,
+        panel.grid = element_blank(),
+        complete = TRUE)
+}
+
+
+export_plot <- function(plotdata, plot1, filename, figurecount, width, height) {
+  knitr::opts_chunk$set(fig.width = width/25.4)
+  knitr::opts_chunk$set(fig.height = height/25.4)
+  knitr::opts_chunk$set(dpi = 108)
+  ggsave(filename = paste("figure.", figurecount, ".", filename, ".png", sep=""), plot = plot1, width=width, height = height, units = "mm", dpi = 600)
+  ggsave(filename = paste("figure.", figurecount, ".", filename, ".pdf", sep=""), plot = plot1, width=width, height = height, units = "mm")
+  write_excel_csv(x = plotdata, path = paste("figure.", figurecount, ".", filename, ".plotdata.csv", sep=""))
+}
+
+# 1980 dots / 23.62 inches (width)
+# 2560 dots / (600/25.4) inches (screen width = 600 mm)
+
+google_colors <- c("#008744" ,"#0057e7", "#d62d20", "#ffa700")
+
+figurecount   <- 1 # init 
+```
+
+```{r}
+
+df <- read_csv(file = "chap04e1HumanGeneLengths.csv")
+
+```
+
+
+```{r}
+
+plot1 <- ggplot(data = df, aes(x=geneLength)) + 
+  geom_histogram(fill="firebrick", color="black") + 
+  theme_palle() +
+  xlab("Gene length (number of nucleotides)") +
+  ylab("Frequency") +
+  ggtitle(paste("Mean", formatC(x = mean(df$geneLength), digits = 3, format = "f"),
+                "\nSD", formatC(x = sd(df$geneLength), digits=3, format="f")
+                )) + 
+  xlim(0,15000) + 
+  NULL
+
+export_plot(plotdata = df, plot1=plot1, filename="gene.lengths.population", figurecount=figurecount, width=160, height=120)
+
+```
+
+```{r}
+plot(plot1)
+figurecount <- figurecount + 1
+```
+
+# Sample 100
+
+```{r}
+
+set.seed(0)
+
+dfsub <- df %>% sample_n(size = 100)
+
+plot1 <- ggplot(data = dfsub, aes(x=geneLength)) + 
+  geom_histogram(binwidth=500, fill="firebrick", color="black") + 
+  theme_palle() +
+  xlab("Gene length (number of nucleotides)") +
+  ylab("Frequency") +
+  ggtitle(paste("Mean", formatC(x = mean(dfsub$geneLength), digits = 3, format = "f"),
+                "\nSD", formatC(x = sd(dfsub$geneLength), digits=3, format="f")
+                )) + 
+  NULL
+
+export_plot(plotdata=dfsub, plot1=plot1, filename="gene.lengths.sample", figurecount=figurecount, width=160, height=120)
+```
+
+```{r}
+plot(plot1)
+figurecount <- figurecount + 1
+```
+
+# Sampling distribution of the mean (figure 4.1-3)
+
+
+```{r}
+
+set.seed(0)
+r <- data.frame() %>% tbl_df()
+for (i in 1:10000) {
+  dfsub = df %>% sample_n(size = 100)
+  r <- rbind(r, data.frame(n = nrow(dfsub), gene.mean = mean(dfsub$geneLength)))
+}
+
+plot1 <- ggplot(data = r, aes(x=gene.mean)) + 
+  geom_histogram(fill="firebrick", color="black") + 
+  theme_palle() +
+  xlab("Sample mean length Y (nucleotides)") +
+  ylab("Frequency") +
+  ggtitle(paste("Mean", formatC(x = mean(r$gene.mean), digits = 3, format = "f"),
+                "\nSD", formatC(x = sd(r$gene.mean), digits=3, format="f")
+                )) + 
+  NULL
+
+export_plot(plotdata=r, plot1=plot1, filename="gene.lengths.sampling.distribution", figurecount=figurecount, width=160, height=120)
+```
+
+```{r}
+plot(plot1)
+figurecount <- figurecount + 1
+```
+
+# Effect of sample size (figure 4.1-4)
+
+```{r}
+
+set.seed(0)
+
+r <- data.frame() %>% tbl_df()
+
+for (i in 1:10000) {
+  # n=20
+  dfsub <- df %>% sample_n(size = 20)
+  r     <- rbind(r, data.frame(n = nrow(dfsub), gene.mean = mean(dfsub$geneLength)))
+  # n=100
+  dfsub <- df %>% sample_n(size = 100)
+  r     <- rbind(r, data.frame(n = nrow(dfsub), gene.mean = mean(dfsub$geneLength)))
+  # n=500
+  dfsub <- df %>% sample_n(size = 500)
+  r     <- rbind(r, data.frame(n = nrow(dfsub), gene.mean = mean(dfsub$geneLength)))
+}
+
+r <- r %>% tbl_df()
+
+plot1 <- ggplot(data = r, aes(x=gene.mean)) + 
+  geom_histogram(aes(y=stat(density)), fill="firebrick", bins = 100, color="black") + 
+  xlab("Sample mean length Y (nucleotides)") +
+  ylab("Frequency") +
+  facet_wrap(~paste("n =", n), scales = "free_y", ncol=1)  +
+  theme_palle() +
+  NULL
+
+export_plot(plotdata=r, plot1=plot1, filename="gene.lengths.sampling.distributions.different.samplesize", figurecount=figurecount, width=160, height=120)
+```
+
+```{r}
+plot(plot1)
+figurecount <- figurecount + 1
+```
+
+#### True standard error of the mean from population sd (normally unknown)
+
+```{r}
+
+r %>% 
+  group_by(n) %>% 
+  summarise(samples = n()) %>%
+  ungroup() %>%
+  mutate(popsd = sd(df$geneLength),
+         stderr =  popsd / sqrt(n))
+
+```
+
+#### Estimated standard error of the mean from the sampling distribution
+
+```{r}
+
+r %>% 
+  group_by(n) %>% 
+  summarise(samples = n(),sd = sd(gene.mean))
+
+```
+
+#### Estimated standard error of the mean from single sample (real world)
+
+```{r}
+
+set.seed(0)
+dfsub     <- df %>% sample_n(size = 100)
+gene.mean <- mean(dfsub$geneLength)
+gene.SE   <- sd(dfsub$geneLength) / sqrt(nrow(dfsub))
+
+gene.mean
+gene.SE
+gene.mean - 2*gene.SE
+gene.mean + 2*gene.SE
+
+```
+
+
