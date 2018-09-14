@@ -1,0 +1,243 @@
+---
+title: "Data Science for Bioinformatics - Week 03"
+author: "Thomas Bataillon"
+date: "September 3, 2018"
+output:
+  html_document:
+        theme: readable
+---
+
+
+# Goals for the R session in data science exercise week 3 
+
+Either you can do all the exercises in this document (to save your answers) or a new one (a good idea to call week.03.MyName.Rmd)
+This R session assumes that you have read and a good command of chapter 5 in the ABD book. 
+Seesion goals are :
+
+* Use R to simulate random variables and calculate probabilties
+* Calculate probabilities by hand 
+* Calculate expectation and variance of a random variable
+* Calculate the expectation and variance of a sum of $n$ random variables and relate this to the terms:
+    + Mean of a sample
+    + SD of a population
+    + SE of a sample
+
+# Background information on random variables 
+Random variables are a very useful notation in probability and statistics. You can use them for recording the possible outcomes of random trials as numerical values. For instance, a random variable X could be defined as being equal to the number of heads in a coin flip: 
+X= 1 for heads, and X= 0 for tails, or could be defined as the value of a dice roll (so X could be equal to 1,2...up to 6). 
+
+We can specify the probability distribution of X, by specifying the probabilities that X =0, X=1, etc. 
+For a "fair coin" we would have $P(X=0) = P(X=1) = \frac{1}{2}$.
+
+If a random variable X has T possible values: $T=0,1, 2, ..., T$, with associated probability distribution $P(X=0)$, $P(X=1)$, etc.; then the expectation of X, $E[X]$ is defined as: 
+
+$$E[X] = 0 \cdot Pr(X=0) + 1 \cdot Pr(X=1) + 2 \cdot Pr(X=2) + ... + T \cdot P(X=T).$$
+
+In a more compact way we can write that down as: 
+$$E[X]=\sum_{i=0}^{T} i \cdot P(X=i).$$
+
+In other words an, the Expectation ($E[.]$ ) of a random variable is a (weighted) mean: it represents the typical value one" expects". Here the *weighted* average is taken by weighting each possible numerical value of a random variable can take with the probability it takes that value)
+One useful trick to calculate the variance of a random variable: $V[X] = E[X2] - (E[X])^{2}$.
+
+
+#Exercises
+##A. Manipulating (sums of) random variables, and their expectations  (pencil & paper)
+###A1
+<em><b>X</b> and <b>Y</b> are independent random variables and <b>a</b> and <b>b</b> are constants. You have the following scaled random variables:</em>
+
+$$
+\begin{aligned}
+U &= X + Y\\
+V &= a \cdot X \\ 
+W &= a \cdot X + b
+\end{aligned}
+$$ 
+
+**a) Calculate the expectation of these random variables**
+
+$$E[U]=E[X + Y] = E[X] + E[Y]$$ 
+
+$$E[a \cdot X] = E[a] \cdot E[X] = a \cdot E[X]$$
+
+\begin{center} because the expectation of a constant is the constant itself \end{center}
+
+$$E[a \cdot X + b] = E[a] \cdot E[X] + E[b] = a \cdot E[X] + b$$
+
+**b) Calculate the variance and relate these results to the table on page 85 (effect of scaling a statistical measurement)!**
+
+The variance of two independent random variables can be added together
+
+$$V[U] = V[X] + V[Y]$$  
+
+$$V[a \cdot X] = V[X] = a^2 \cdot V[X]$$ 
+
+\begin{center} the variance of the random variable is multiplied by the square of the constant \end{center}
+
+$$V[a \cdot X + b] = a^2 \cdot V[X]$$ 
+\begin{center} adding a constant doesn't change the variance \end{center}
+
+Note : If you look at the table on page 85 in the ABD book, it shows you these exact same rules.
+
+**Make your own proofs here:**
+
+
+### A2
+Imagine that you have n measurements (or observations) that are independent from each other, and that each observation comes from the same underlying population. We define a random variable for each measurement: $X_1$, $X_2$,..., $X_n$. All random variables $X_i$ are independent have the same underlying probability distribution.
+
+Note that $\mu = E[X_i]$ and $\sigma^2 = V[X_i]$ are the means and the variance of the population we sample from.
+
+A random variable **M** is defined, as the mean of a sample of n measurements
+
+$$M = \frac{X_1+X_2+...X_n}{n}$$
+
+Here is the most important thing you have to notice: recall the discussion in chpater 4 about sampling distributions. 
+If you are calculating the expectation (weighted mean) and the variance of M, this give us insight on the sampling distribution of the mean!
+
+
+**Calculate E[M] and discuss what this implies when we estimate the mean of a population from the sample mean**
+
+
+$$
+\begin{aligned}
+E[M] &= E[(X_1+...+X_n) / n]  & & \text{} \\
+&= 1/n \cdot (E[X_1] + ... + E[X_n]) & & \text{1/n is moved out of the equation}\\
+&= 1/n \cdot (\mu + ... + \mu) & & \text{E[Xi] is substituted with } \mu \\
+&= 1/n \cdot (n\cdot \mu) & & \text{There are n means multiplied together }\\
+&= \mu
+\end{aligned}
+$$
+This means that the expected value of the sample mean is exactly the same as the mean of the individual $X_i$ - this means that whenever we want to estimate the mean of a population parameter, calculating the mean of our sample is the best we can do.
+
+
+
+**Calculate V[M] and sqrt(V[M]) and relate your result to the formula of the book when calculating the SE of a mean in a sample with size n**
+
+
+##B. Manipulating the "indicator" random variable
+
+Let X be a random variable recording the genotype of a diploid individual for a given SNP in the genome. 
+An individual is either AA, AT or TT and we map the genotype to the number of A alleles so if we have an individual being TT then X=0, AT then X=1, and AA then X=2.
+Imagine that we sample a very large (infinite) population and that the frequency of T in the population is 0.15. Imagine also that individuals are mating at random.
+
+**Calculate the following probabilities:**
+
+X = 0 means that the individual has the TT genotype.  
+$$Pr(X = 0) = Pr[T] \cdot Pr[T] = 0.15 \cdot 0.15 = 0.0225$$
+
+X = 1 means that the individual has the AT genotype.  
+$$Pr(X = 1) = (Pr[A] \cdot Pr[T]) + (Pr[T] \cdot Pr[A]) = 0.85 \cdot 0.15 = 0.255$$
+
+X = 2 means that the individual has the AA genotype.  
+$$Pr(X = 2) = Pr[A] \cdot Pr[A] = 0.85 \cdot 0.85 = 0.7225$$
+**Calculate E[X] and V[X]**
+
+$$E[X] = 0\cdot Pr[X = 0] + 1\cdot Pr[X = 1]+2\cdot Pr[X = 2] = 0\cdot 0.0225 + 1\cdot 0.255 + 2\cdot 0.7225 = 1.7$$
+
+Fine, but what does this mean? According to this calculation the expectation of $X$ is 1.7 - however, we don't even have this option. $X$ can be either 0, 1 or 2, corresponding to the genotypes TT, AT and AA. Our result is closest to 2, so we can say that we'd expect genotype AA to be the "typical" one. If we're looking at the probabilities, this actually makes sense as the probability of the AA genotype is the largest, 0.7225, so we wouldn't be very suprised to observe that genotype the most often.
+
+Quick sidenote: if you think about 0, 1 and 2 as numbers here, you might be led astray because then you might start thinking that when we're multiplying $Pr[X = 0]$ by 0, we're essentially "losing" or "disregarding" it. This is not true. Let's imagine a population where there are *only* TT individuals (so no A alleles whatsoever). Then the calculation would look like this:
+
+$$Pr(X = 0) = Pr[T] \cdot Pr[T] = 1 \cdot 1 = 1$$
+$$Pr(X = 1) = (Pr[A] \cdot Pr[T]) + (Pr[T] \cdot Pr[A]) = 1 \cdot 0 = 0$$
+$$Pr(X = 2) = Pr[A] \cdot Pr[A] = 0 \cdot 0 = 0$$
+
+$$E[X] = 0 \cdot Pr[X = 0] + 1 \cdot Pr[X = 1]+2 \cdot Pr[X = 2] = 0 \cdot 1 + 1 \cdot 0 + 2 \cdot 0 = 0$$
+Does this mean that we calculated that the expectation is *nothing*? No. What we calculated is that the expectation is 0, corresponding to genotype TT, meaning that the typical individual has the TT genotype, which makes sense if there are only T alleles in the population. So in this case think about the values of $X$ as "indicators" for the genotypes.
+
+Let's get back to the original exercise now and calculate the variance:
+
+$$V[X] = E[X^2] - (E[X])^2 = (0\cdot0.0225 + 1\cdot0.255 + 4\cdot0.7225) - 1.7^2 = 3.145 - 2.89 = 0.255$$
+Notice what you need to square here! $(E[X])^2$ is fairly simple - you just take what you calculated in the previous exercise, square it and call it a day.  
+$E[X^2]$ is a bit more tricky - it's the expectation of $X^2$. **The probabilities remain the same**, however, you need to multiply them by $X^2$ instead of $X$ (ie. 0, 1, and 4 instead of 0, 1 and 2). 
+
+
+#C. Solve in R the following book exercise as a check 
+Do the following practice problems  in Chapter 5 to check that you manipulate easily probabilities 5 (these will be discussed only briefly in class):
+
+* 1 and 2 (addition and total probability rule)
+
+```{r}
+blood_preassure_m = c(112,128,108,129,125,153,155,132,137)
+length(blood_preassure_m)
+sum(blood_preassure_m)
+blood_mean = mean(blood_preassure_m)
+blood_mean
+
+sum(blood_preassure_m^2)
+var(blood_preassure_m)
+blood_sd = sd(blood_preassure_m)
+blood_sd
+
+#Coefficient of variation.
+blood_sd / blood_mean 
+
+```
+
+* 10, 12 (probability of several independent events occuring simultaneously),
+* 14, 17 (kahoot these) 
+* 18 from chapter 
+
+#D. Using R to calculate and simulate from known probability distributions
+During the course we are going to "meet" a number of theoretical probability distributions, there arise in the context of specific types of data and specific random trials that we imagine are "behind" the data: the 4 distributions we are going to meet in the coming chapters are : 
+* the binomial distribution (chapter 6 and 7 in the ABD book)
+* the Poisson and the $\chi^2$ distribution (in chapter 8 )
+* the infamous "normal" or Gaussian distribution (chpat 10, 11 and 12)
+R is pretty effective at drawing random number and calculating the proability of specific events with these distributions
+
+##D1. Simulating random numbers from your own distribution / theoretical distributions
+Use R functions to simulate 100 random numbers from:
+
+- a normal distribution with mean 1000 and SD 200
+- the empirical distribution of  gene length in humans this distribution is provided in the ABD R package)
+- a fair 6-sided dice  
+```{r}
+norm_sample = rnorm(100, 1000, 200)
+norm_sample[40:50]
+
+diced = seq(1, 6)
+sample(diced, 100, replace = TRUE)
+```
+
+
+##D2. Monte Carlo probabilities versus exact calculations
+
+Consider a random variable X that is normally distributed with mean 0 and variance 1. 
+Calculate (exactly) and exactly the following probabilities:
+
+- A: "X=0
+- B: "0<X<3"
+- C: "X > 5"
+- D: "X> 10
+
+Hint 1. to calculate exactly the probabilities use the R function that gives the cumulative distribution function of a normal probability distribution
+Hint 2. you can also simulate a large number of random realizations from X and use the simulations to approximate  
+```{r}
+pnorm(q= 0, mean = 0, sd = 1)
+
+p_le_0 = pnorm(q= 0, mean = 0, sd = 1)
+p_gt_0 = 1-p_le_0
+p_lt_3 = pnorm(q=3, mean=0, sd=1)
+p_gt0_lt3 = p_gt_0 * p_lt_3
+p_gt0_lt3
+
+p_gt_5 = 1 - pnorm(q=5, mean=0, sd=1)
+p_gt_5
+
+p_gt_10 = 1 - pnorm(q=10, mean=0, sd=1)
+p_gt_10
+```
+Reproduce the figure 5.4-3 of the ABD book (this represents the probability density function of a normal distribution ) 
+Hint use the R function dnorm(). 
+Compare with the histogram of 10^4 random deviates from the same distributions
+What is different .. what are the Y axis scale .. how can they be made comparable?
+
+```{r}
+x = rnorm(10^5, 0, 1)
+y = dnorm(x, 0, 1)
+plot(x, y)
+
+sample10k = sample(x, 10^4)
+hist(sample10k)
+
+# To make the Y axis comparable, we need to replace the frequencies in the histogram with the probabilities.
+```
