@@ -52,15 +52,13 @@ mammals = read_csv(file = "../datasets/dataset.01.rsbl20150010supp1.csv")
 Recall that we did a new variable called "expression" that is the log10(RPKM+1)
 
 ```{r}
-
-
 ```
 
 
 Hint: adapt the code you used when obtaining the mean, median and standard deviation of the expression for each Species.
 
 ```{r}
-
+mam_mut = mammals %>% group_by(chr, Species, chrMark) %>% summarise(mean_dnds = mean(dNdS), expr = mean(log10(RPKM + 1)))
 
 ```
 
@@ -68,6 +66,8 @@ Hint: adapt the code you used when obtaining the mean, median and standard devia
 Hint: geom_smooth() can be used in ggplot to add regression lines (lookup/ resuse examples of the r for data science book)
 
 ```{r}
+ggplot(mam_mut) + geom_point(mapping = aes(x = expr, y = mean_dnds, color = Species, shape = chrMark)) + 
+  geom_smooth(mapping = aes(x = expr, y = mean_dnds, color = Species), se = FALSE, method = 'lm')
 
 ```
 ## Q3: Are genes on the X more often lowly expressed ?
@@ -75,9 +75,49 @@ For each species in the dataset:
  
  * Calculate the number (and proportion) of genes that are in the lower 15% range of gene expression for each chromosome. Note that the 15% cutoff value you should use is species specific.
  
+```{r}
+mammals %>%
+  group_by(chr,Species) %>%
+  mutate(all_n = n(), expr = log10(RPKM + 1), cutoff = quantile(expr, .15)) %>%
+  filter(expr < cutoff) %>%
+  summarise(count = length(expr), prop = mean(n()/all_n), all_n = mean(all_n))
+```
+ 
+ 
  * test if the X chromosome has a higher proportion of genes in the lower 15% of expression relative to the rest of the genome.  Hint. Adapt the book ABD example of the binomial test for a proportion (Example 7.2 Sex and the X).
+ 
+```{r}
+mammals %>%
+  mutate(total = n(), expr = log10(RPKM + 1), cutoff = quantile(expr, .15)) %>%
+  filter(expr < cutoff) %>%
+  summarise(count = length(expr), total = mean(total))
 
+#prob under X: 0.061.
+# prrob under 15%: 1.149
+# total x chr: 382
+# x chr under 15% : 58
+binom.test(58, 382, 0.061, alternative = "greater")
+```
+Answer: The null hypothesis is that the X chromozone has a higher proportion of genes in the lower 15%. Having a total of 328 genes under the X chromozone, of which 58 are under the 15%. we use the binomial test, and get a  p-value = 1.945e-10, which is low enough that the null hypothesis holds.
+
+ 
 * Try a different cutoff for "low gene expression" (say 5%), and examine how sample size, difference between X vs rest and p values are affected by the change of threshold.
+
+```{r}
+mammals %>%
+  group_by(chr) %>%
+  mutate(total = n(), expr = log10(RPKM + 1), cutoff = quantile(expr, .05)) %>%
+  filter(expr < cutoff, chr == 'X') %>%
+  summarise(count = length(expr), total = mean(total))
+
+#prob under X: 0.061.
+# prrob under 15%: 1.149
+# total x chr: 382
+# x chr under 5% : 20
+binom.test(20, 382, 0.061, alternative = "greater")
+```
+
+As we can see, the p value greatly increasead so we cannot say that our null hypothesis still holds.
 
 * bonus question: if we restrict ourselves to subset of the (15%) low expression genes, what proportion of these genes have a high dn/ds (use the quantiles of the dn/ds distribution to decide on a cutoff), and is this proportion significantly different between autosomes and the X ? 
 
