@@ -53,6 +53,13 @@ Recall that we did a new variable called "expression" that is the log10(RPKM+1)
 
 ```{r}
 
+mammals = mammals %>% 
+  mutate(log10RPKM = log10(RPKM+1))
+
+mammals_meta = mammals %>% 
+  group_by(chr, Species, chrMark) %>% 
+  summarise(mean_dNdS = mean(dNdS), mean_logRPKM = mean(log10RPKM))
+  
 
 ```
 
@@ -62,6 +69,7 @@ Hint: adapt the code you used when obtaining the mean, median and standard devia
 ```{r}
 
 
+
 ```
 
 ##Q2: Reproduce the figure 1 of the paper where the covariation between dN/dS and RPKM is visualized.
@@ -69,13 +77,58 @@ Hint: geom_smooth() can be used in ggplot to add regression lines (lookup/ resus
 
 ```{r}
 
+ggplot(mammals_meta, aes(mean_logRPKM, mean_dNdS, color = Species, shape = chrMark)) + geom_point() + 
+  geom_smooth(method = "lm", fill = NA) +
+  scale_color_discrete(name = "species") +
+  scale_shape_discrete(name = "chromosomes") +
+  labs(x = "mean RPKM", y = "dN/dS")
+  
+
+
+
 ```
 ## Q3: Are genes on the X more often lowly expressed ?
 For each species in the dataset:
+
  
  * Calculate the number (and proportion) of genes that are in the lower 15% range of gene expression for each chromosome. Note that the 15% cutoff value you should use is species specific.
+```{r}
+
+
+mammals_lowmeta = mammals %>% 
+  group_by(Species, chr, chrMark) %>% 
+  summarise(cutoff = quantile(log10RPKM, .15),
+            n = n(),
+            n_low = length(log10RPKM[log10RPKM < cutoff])) %>% 
+  mutate(ratio = n_low / n)
+
+
+
+```
+ 
+ 
  
  * test if the X chromosome has a higher proportion of genes in the lower 15% of expression relative to the rest of the genome.  Hint. Adapt the book ABD example of the binomial test for a proportion (Example 7.2 Sex and the X).
+```{r}
+# Let's start out by visualizing the data a bit.
+ggplot(filter(mammals_lowmeta), aes(ratio, fill = chrMark)) +
+  geom_histogram(bins = 20) +
+  facet_wrap(Species~.)
+
+#I see no trend.
+# Anyway, let's make a test
+
+mammals_lowmeta %>% 
+  group_by(Species, chrMark) %>% 
+  summarise(n = sum(n), n_low = sum(n_low)) %>% 
+  mutate(ratio = n_low / n)
+
+```
+```{r}
+# test for chimpanzee
+binom.test(5, 32, p = 289/1876)
+```
+
 
 * Try a different cutoff for "low gene expression" (say 5%), and examine how sample size, difference between X vs rest and p values are affected by the change of threshold.
 
