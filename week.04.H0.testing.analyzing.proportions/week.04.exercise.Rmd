@@ -1,0 +1,83 @@
+---
+title: "Data Science for Bioinformatics - Week 04"
+author: "Thomas Bataillon"
+date: "September 13, 2018"
+output:
+  html_document:
+        theme: readable
+---
+
+
+### ABD book readings ###
+Read through chapter 6 and 7. Lecture tuesday will be on testing a null hypothesis, what is a p-value, with concrete examples from the book. 
+
+### R for data science readings #### 
+
+Either you can do all the exercises in this document (to save your answers) or a new one.
+
+The tutorial is from the free book "R for data science" written by the R Overlord Hadley Wickham
+
+URL: http://r4ds.had.co.nz/index.html
+
+- Go through 6. Workflow : scripts (this should be quick as you know the R studio env)
+- Go through 7. Exploratory Data Analysis   
+try exercises in the chapter 6  & 7  
+
+
+#### Work on the mammals dataset (resuming the work we started in week 3) 
+We will work (again) on the data from 
+Nguyen L-P, Galtier N, Nabholz B. 2015 Gene expression, chromosome heterogeneity and the fast-X effect in mammals. Biol. Lett.11 : 20150010.
+
+In week 2 you have made some  basic visual displays of a fraction of the data (the RPKM variable), producing histogram for each species.
+
+Here we continue to work on this dataset and the goal of this R session is to dig deeper in the data vizualization and the data analysis of the paper.
+
+More specifically 2 main goals of this session are :
+
+- To reproduce the Figure 1 of the paper
+- To use binomial tests for proportions to test if the genes sitting on X chromosome have atypical patterns of gene expression ( as measured by RPKM) and gene evolution (as measured by dn/ds). Note that these tests are not made as such in the paper where they rely instead on a global linear model (we will come to that in a few weeks, patience ;-))
+
+# Loading the data
+```{r}
+
+library(tidyverse)
+mammals = read_csv(file = "../datasets/dataset.01.rsbl20150010supp1.csv")
+
+```
+
+# Gene expression and its pattern of covariation with dn/ds in the mammals dataset. 
+
+## Q1: Create a new dataset that contains means per chromosome of dn/ds and log10(RPKM+1)
+
+Recall that we did a new variable called "expression" that is the log10(RPKM+1)
+
+```{r}
+
+
+```
+
+
+Hint: adapt the code you used when obtaining the mean, median and standard deviation of the expression for each Species.
+
+```{r}
+
+
+```
+
+##Q2: Reproduce the figure 1 of the paper where the covariation between dN/dS and RPKM is visualized.
+Hint: geom_smooth() can be used in ggplot to add regression lines (lookup/ resuse examples of the r for data science book)
+
+```{r}
+
+```
+## Q3: Are genes on the X more often lowly expressed ?
+For each species in the dataset:
+ 
+ * Calculate the number (and proportion) of genes that are in the lower 15% range of gene expression for each chromosome. Note that the 15% cutoff value you should use is species specific.
+ 
+ * test if the X chromosome has a higher proportion of genes in the lower 15% of expression relative to the rest of the genome.  Hint. Adapt the book ABD example of the binomial test for a proportion (Example 7.2 Sex and the X).
+
+* Try a different cutoff for "low gene expression" (say 5%), and examine how sample size, difference between X vs rest and p values are affected by the change of threshold.
+
+* bonus question: if we restrict ourselves to subset of the (15%) low expression genes, what proportion of these genes have a high dn/ds (use the quantiles of the dn/ds distribution to decide on a cutoff), and is this proportion significantly different between autosomes and the X ? 
+
