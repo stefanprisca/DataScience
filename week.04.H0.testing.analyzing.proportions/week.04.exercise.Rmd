@@ -88,8 +88,9 @@ mammals %>%
  
 ```{r}
 mammals %>%
+  group_by(chr) %>%
   mutate(total = n(), expr = log10(RPKM + 1), cutoff = quantile(expr, .15)) %>%
-  filter(expr < cutoff) %>%
+  filter(expr < cutoff, chr == 'X') %>%
   summarise(count = length(expr), total = mean(total))
 
 #prob under X: 0.061.
@@ -114,7 +115,7 @@ mammals %>%
 # prrob under 15%: 1.149
 # total x chr: 382
 # x chr under 5% : 20
-binom.test(20, 382, 0.061, alternative = "greater")
+binom.test(20, 382, 0.021, alternative = "greater")
 ```
 
 As we can see, the p value greatly increasead so we cannot say that our null hypothesis still holds.
