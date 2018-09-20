@@ -199,30 +199,17 @@ try exercises in the chapter 6 &amp; 7</li>
 <ul>
 <li>Calculate the number (and proportion) of genes that are in the lower 15% range of gene expression for each chromosome. Note that the 15% cutoff value you should use is species specific.</li>
 </ul>
-<pre class="r"><code>mammals %&gt;%
+<pre class="r"><code>mammals2 = mammals %&gt;%
   group_by(chr,Species) %&gt;%
   mutate(all_n = n(), expr = log10(RPKM + 1), cutoff = quantile(expr, .15)) %&gt;%
   filter(expr &lt; cutoff) %&gt;%
   summarise(count = length(expr), prop = mean(n()/all_n), all_n = mean(all_n))</code></pre>
-<pre><code>## # A tibble: 136 x 5
-## # Groups:   chr [?]
-##    chr   Species count  prop all_n
-##    &lt;chr&gt; &lt;chr&gt;   &lt;int&gt; &lt;dbl&gt; &lt;dbl&gt;
-##  1 1     Chimp      29 0.150   193
-##  2 1     Gori       27 0.152   178
-##  3 1     Human      29 0.152   191
-##  4 1     Maca       67 0.152   442
-##  5 1     Mouse      48 0.150   319
-##  6 1     Oran       52 0.152   343
-##  7 10    Chimp      16 0.150   107
-##  8 10    Gori       16 0.151   106
-##  9 10    Human      17 0.156   109
-## 10 10    Maca       29 0.153   190
-## # ... with 126 more rows</code></pre>
 <ul>
 <li>test if the X chromosome has a higher proportion of genes in the lower 15% of expression relative to the rest of the genome. Hint. Adapt the book ABD example of the binomial test for a proportion (Example 7.2 Sex and the X).</li>
 </ul>
-<pre class="r"><code>mammals %&gt;%
+<pre class="r"><code># total x chr: 382
+# x chr under 15% : 58
+mammals %&gt;%
   group_by(chr) %&gt;%
   mutate(total = n(), expr = log10(RPKM + 1), cutoff = quantile(expr, .15)) %&gt;%
   filter(expr &lt; cutoff, chr == 'X') %&gt;%
@@ -231,28 +218,35 @@ try exercises in the chapter 6 &amp; 7</li>
 ##   chr   count total
 ##   &lt;chr&gt; &lt;int&gt; &lt;dbl&gt;
 ## 1 X        58   382</code></pre>
-<pre class="r"><code>#prob under X: 0.061.
-# prrob under 15%: 1.149
-# total x chr: 382
-# x chr under 15% : 58
-binom.test(58, 382, 0.061, alternative = &quot;greater&quot;)</code></pre>
+<pre class="r"><code>#prob under X: 
+mammals %&gt;%
+  group_by(chr) %&gt;%
+  mutate(total = n(), expr = log10(RPKM + 1), cutoff = quantile(expr, .15)) %&gt;%
+  filter(expr &lt; cutoff, chr != 'X') %&gt;%
+  summarise(mean_prop = (mean(n()/total))) %&gt;% summarise(mean_overall = mean(mean_prop))</code></pre>
+<pre><code>## # A tibble: 1 x 1
+##   mean_overall
+##          &lt;dbl&gt;
+## 1        0.151</code></pre>
+<pre class="r"><code>binom.test(58, 382, 0.151, alternative = &quot;greater&quot;)</code></pre>
 <pre><code>## 
 ##  Exact binomial test
 ## 
 ## data:  58 and 382
-## number of successes = 58, number of trials = 382, p-value =
-## 1.945e-10
-## alternative hypothesis: true probability of success is greater than 0.061
+## number of successes = 58, number of trials = 382, p-value = 0.5037
+## alternative hypothesis: true probability of success is greater than 0.151
 ## 95 percent confidence interval:
 ##  0.1224117 1.0000000
 ## sample estimates:
 ## probability of success 
 ##              0.1518325</code></pre>
-<p>Answer: The null hypothesis is that the X chromozone has a higher proportion of genes in the lower 15%. Having a total of 328 genes under the X chromozone, of which 58 are under the 15%. we use the binomial test, and get a p-value = 1.945e-10, which is low enough that the null hypothesis holds.</p>
+<p>Answer: The null hypothesis is that the X chromozone has a lower proportion of genes in the lower 15%. Having a total of 328 genes under the X chromozone, of which 58 are under the 15%. we use the binomial test, and get a p-value = 0.5037, which is high enough to accept that the probability of the X chromosome falling within the lower 15% is greater than the overall probability for all genes of 0.151.</p>
 <ul>
 <li>Try a different cutoff for “low gene expression” (say 5%), and examine how sample size, difference between X vs rest and p values are affected by the change of threshold.</li>
 </ul>
-<pre class="r"><code>mammals %&gt;%
+<pre class="r"><code># total x chr: 382
+# x chr under 5% : 20
+mammals %&gt;%
   group_by(chr) %&gt;%
   mutate(total = n(), expr = log10(RPKM + 1), cutoff = quantile(expr, .05)) %&gt;%
   filter(expr &lt; cutoff, chr == 'X') %&gt;%
@@ -261,24 +255,29 @@ binom.test(58, 382, 0.061, alternative = &quot;greater&quot;)</code></pre>
 ##   chr   count total
 ##   &lt;chr&gt; &lt;int&gt; &lt;dbl&gt;
 ## 1 X        20   382</code></pre>
-<pre class="r"><code>#prob under X: 0.061.
-# prrob under 15%: 1.149
-# total x chr: 382
-# x chr under 5% : 20
-binom.test(20, 382, 0.021, alternative = &quot;greater&quot;)</code></pre>
+<pre class="r"><code>#prob under X: 
+mammals %&gt;%
+  group_by(chr) %&gt;%
+  mutate(total = n(), expr = log10(RPKM + 1), cutoff = quantile(expr, .05)) %&gt;%
+  filter(expr &lt; cutoff, chr != 'X') %&gt;%
+  summarise(mean_prop = (mean(n()/total))) %&gt;% summarise(mean_overall = mean(mean_prop))</code></pre>
+<pre><code>## # A tibble: 1 x 1
+##   mean_overall
+##          &lt;dbl&gt;
+## 1       0.0513</code></pre>
+<pre class="r"><code>binom.test(20, 382, 0.0513, alternative = &quot;greater&quot;)</code></pre>
 <pre><code>## 
 ##  Exact binomial test
 ## 
 ## data:  20 and 382
-## number of successes = 20, number of trials = 382, p-value =
-## 0.0002174
-## alternative hypothesis: true probability of success is greater than 0.021
+## number of successes = 20, number of trials = 382, p-value = 0.495
+## alternative hypothesis: true probability of success is greater than 0.0513
 ## 95 percent confidence interval:
 ##  0.03496404 1.00000000
 ## sample estimates:
 ## probability of success 
 ##             0.05235602</code></pre>
-<p>As we can see, the p value greatly increasead so we cannot say that our null hypothesis still holds.</p>
+<p>p-value of 0.495</p>
 <ul>
 <li>bonus question: if we restrict ourselves to subset of the (15%) low expression genes, what proportion of these genes have a high dn/ds (use the quantiles of the dn/ds distribution to decide on a cutoff), and is this proportion significantly different between autosomes and the X ?</li>
 </ul>
