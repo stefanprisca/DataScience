@@ -96,19 +96,21 @@ For each species in the dataset:
 
 
 mammals_lowmeta = mammals %>% 
-  group_by(Species, chr, chrMark) %>% 
-  summarise(cutoff = quantile(log10RPKM, .15),
+  group_by(Species, chr) %>% 
+  mutate(cutoff = quantile(log10RPKM, .15),
             n = n(),
             n_low = length(log10RPKM[log10RPKM < cutoff])) %>% 
   mutate(ratio = n_low / n)
-
-
 
 ```
  
  
  
  * test if the X chromosome has a higher proportion of genes in the lower 15% of expression relative to the rest of the genome.  Hint. Adapt the book ABD example of the binomial test for a proportion (Example 7.2 Sex and the X).
+
+Null Hypothesis: X Chromozone does not have higher number of genes in the lower 15% than relative to the rest of the genome.
+Alternative: if you consider the distribution of chr, the alternative is that most X fall under the 15th quantile, so the alternative is less. 
+
 ```{r}
 # Let's start out by visualizing the data a bit.
 ggplot(filter(mammals_lowmeta), aes(ratio, fill = chrMark)) +
@@ -119,15 +121,16 @@ ggplot(filter(mammals_lowmeta), aes(ratio, fill = chrMark)) +
 # Anyway, let's make a test
 
 mammals_lowmeta %>% 
-  group_by(Species, chrMark) %>% 
-  summarise(n = sum(n), n_low = sum(n_low)) %>% 
-  mutate(ratio = n_low / n)
+  group_by(Species) %>% 
+  summarise(x_low = sum(n_low[chrMark == 'X']),
+            x_total = sum(n[chrMark == 'X']),
+            auto_low = sum(n_low[chrMark != 'X']),
+            auto_total = sum(n[chrMark != 'X']),
+            p_value = binom.test(x_low, x_total, p = auto_low/auto_total, alternative = 'less')[['p.value']])
 
 ```
-```{r}
-# test for chimpanzee
-binom.test(5, 32, p = 289/1876)
-```
+The above results make sense, as it can be seen from the histograms. The mouse has the X chr in the lower 15%, thus the low p-value (30%) which means that the observations have a lower probability to be by chance. Thus, in the mouse case we can be more confident to reject the null hypothesis.
+In the orangutan case, the X chr falls much higher than the 15th quantile. This can be seen by the higher p-value (80%), which means there is a higher probability that the observations are due to chance. In the orangutan case we less confident to reject the null hypothesis.  
 
 
 * Try a different cutoff for "low gene expression" (say 5%), and examine how sample size, difference between X vs rest and p values are affected by the change of threshold.
