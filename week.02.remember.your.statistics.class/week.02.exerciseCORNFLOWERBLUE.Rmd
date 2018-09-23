@@ -2,7 +2,7 @@
 title: "Data Science for Bioinformatics - Week 02"
 author: "Palle Villesen"
 date: "August 14, 2018"
-output:
+    output:
   html_document:
         theme: readable
 ---
