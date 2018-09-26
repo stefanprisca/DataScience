@@ -90,7 +90,20 @@ ggplot() + geom_density(mapping = aes(x = 1 - pchisq(xsqr_stats, df = 2)), color
 
 >Q3. What distribution we expect to fit the p-values under $H_0$ ?
 
+```{r}
+
+x <- rchisq(84, 9)
+chi_curve = dchisq(x, df= 9)
+
+ggplot() + geom_density(mapping = aes(x = observed_p), color = 'red') + 
+        geom_line(mapping = aes(x = x, y = chi_curve))
+```
+
+We expect the chi2 dist with 9 degrees of freedom to fit the p values under the h0
+
 >Q4. Is the distribution of empirical p-values compatible with H0?
+
+Not really, as seen from the above graph
 
 Discuss what is the most obvious discrepnancy between the null distribution of P vlaues and the observed one. 
 Suggest what could account for this discrepancy
@@ -165,11 +178,17 @@ Because if it is actually random, then the observations are drawn from the same 
 
 ```{r}
 # The event takes value 0 from 
-dpois(x=0, 2)
+dpois(x=0, lambda =  2)
 ```
 
 
 >Q: What is the probability that a stretch of 100 bp was missed entirely ? 
+
+P_100misses = P1 * P2 * P3 * .... * P100. The probability is basically just the product of the individual probabilities. In order to have 100 misses you need cell1 to miss and cell2 to miss and cell3 to miss and ... and cell100 to miss.
+
+```{r}
+dpois(x=0, lambda =  2) ^ 100
+```
 
 
 >Q: use R and the rpois() function to simulate the distribution of coverage you expect if you had a bactertial genome with :
@@ -178,7 +197,25 @@ dpois(x=0, 2)
 2. 10% of genes with "very low" GC content (because they were recently acquied from a GC poor bacteria) but where sequencing did not work well so only 1X was actually achieved
 3. Simulate a genome of 5000 genes 
 
+```{r}
+i_len = 5000 * 0.9
+vl_len = 5000 * 0.1
+
+i_samples = rpois(i_len, 5)
+vl_samples = rpois(vl_len, 1)
+geom_samples = vector('double', length = 5000)
+geom_samples[1:i_len] = i_samples
+geom_samples[(i_len + 1):5000] = vl_samples
+
+ggplot() + geom_density(mapping = aes(geom_samples),  color = 'green') +
+  geom_density(mapping = aes(rpois(5000, 5)))
+
+```
+
+
 >Q: will this look like a Poisson distribution ?
+
+Yes, as it can be seen from the above graph.
 
 
 ### A real life scenario : making power simulations to guide a sequencing experiment 
@@ -198,6 +235,23 @@ Biologist are eager to know: how many individuals should we sequence to maximize
 Here is a sugegsted step by step procedure to figure that out:
 
 >Simulate 1000 dataset with a range of indiviuduals from 10, to say 100 individuals that accordingly are sequenced at an expected coverage ranging from 5X to 50X.
+
+```{r}
+data_sets = vector('list')
+
+for (i in 1:1000) {
+  data_set = vector('double')
+  for (x in c(5, 10, 20, 25, 50)) {
+    nof_ind = 500 / x
+    sim = rpois(nof_ind, x)
+    data_set = append(data_set, sim)
+  }
+  data_sets[[i]] = data_set
+}
+
+```
+
+
 
 >For each dataset simulate the observed coverage (nb of reads mapped on Ace-1) the observed Variance/Mean ratio in the sample for the observed coverage across individuals.
 
