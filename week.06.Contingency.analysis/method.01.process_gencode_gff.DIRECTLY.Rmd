@@ -1,0 +1,89 @@
+---
+title: "How to read a huge file and work on it in chunks (in memory)"
+output:  html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# Read 10 lines of data
+
+```{r}
+
+library(tidyverse)
+read_lines(file = "gencode.v28.annotation.gff3.gz", n_max = 10, progress = TRUE)
+
+```
+
+# Estimate file size
+
+```{r}
+
+# Estimate number of lines based on size of line 10:1010
+filename  <- "gencode.v28.annotation.gff3.gz"
+chars     <- readLines(con = filename, n = 1010)
+size1000  <- sum(nchar(chars[10:1010]))
+size500   <- sum(nchar(chars[10:510]))
+sizetotal <- file.size(filename)
+cat("Estimated number of lines base on 1000 lines: ", 1000 *  sizetotal / size1000, "\n")
+cat("Estimated number of lines base on 500 lines: ", 500 *  sizetotal / size500, "\n")
+rm (chars, size1000, size500,sizetotal)
+
+```
+
+# Read 10 lines with correct field sep and header etc.
+
+```{r}
+
+library(tidyverse)
+read_tsv(file = "gencode.v28.annotation.gff3.gz", col_names = F, comment = "#", skip = 0, n_max = 10, progress = TRUE )
+
+```
+
+# Read and filter data
+
+```{r cache=FALSE}
+
+library(tidyverse)
+
+
+f <- function(df1, pos) {
+  names(df1) <- c("seqname", "source", "feature", "start","end", "score","strand","frame","attribute")  
+  df1 <- df1 %>% filter(feature=="gene")
+  return(df1)
+}
+
+df <- read_tsv_chunked(file = "gencode.v28.annotation.gff3.gz", 
+                 callback = ListCallback$new(f), 
+                 chunk_size = 1000000, col_names = F, comment = "#", 
+                 progress = FALSE ) # Set to false when knitting
+
+length(df)
+df        <- bind_rows(df)
+
+# Save gene annotation as rds file
+write_rds(x = df, path = "gencode.genes.rds", compress = "gz")
+
+```
+
+# Report example 1
+
+```{r}
+
+df <- read_rds(path = "gencode.genes.rds")
+
+rp <- df %>%
+  mutate(length = end-start) %>%
+  group_by(seqname) %>%
+  summarise(mean      = mean(length),
+            median    = median(length),
+            max       = max(length),
+            min       = min(length),
+            genebases = sum(length),
+            n         = n()) %>%
+  tbl_df() %>%
+  {.}
+
+rp
+
+```
+

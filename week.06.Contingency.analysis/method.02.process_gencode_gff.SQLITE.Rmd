@@ -1,0 +1,116 @@
+---
+  title: "IVF eggs"
+author: "Palle Villesen"
+output:
+  html_document:
+  theme: readable
+editor_options: 
+  chunk_output_type: console
+---
+  
+  
+# Read 10 lines of data
+
+```{r}
+
+library(tidyverse)
+read_lines(file = "gencode.v28.annotation.gff3.gz", n_max = 10, progress = TRUE)
+
+```
+
+
+```{r}
+
+library(tidyverse)
+read_tsv(file = "gencode.v28.annotation.gff3.gz", col_names = F, comment = "#", skip = 0, n_max = 10, progress = TRUE )
+
+```
+
+
+# Read and dump data to database
+
+```{r cache=FALSE}
+
+library(tidyverse)
+library(RSQLite)
+
+f <- function(df1, pos) {
+  names(df1) <- c("seqname", "source", "feature", "start","end", "score","strand","frame","attribute")  
+  dbWriteTable(con, name="genes", value=df1, overwrite = pos == 1, append = pos!=1)
+}
+
+con       <- dbConnect(drv = RSQLite::SQLite(), dbname = "gencode.sqlite")
+
+read_tsv_chunked(file = "gencode.v28.annotation.gff3.gz", 
+                 callback = SideEffectChunkCallback$new(f), 
+                 chunk_size = 1000000, col_names = F, comment = "#", progress = TRUE )
+
+dbDisconnect(con)
+
+```
+
+# Use the database
+
+```{r }
+
+library(tidyverse)
+library(RSQLite)
+
+con <- dbConnect(drv = RSQLite::SQLite(), dbname = "gencode.sqlite")
+
+for(name in dbListTables(conn = con)) {
+  print(paste("Database table:", name ))
+  print(dbGetQuery(conn = con, paste("SELECT * FROM ", name, " limit 3;")) %>% tbl_df())
+}
+
+
+
+```
+
+# Report example 1
+
+```{r}
+
+# Read data from database
+df <- dbGetQuery(conn = con, 'SELECT * FROM genes WHERE feature=="gene"') %>% 
+  tbl_df() %>%
+  {.}
+
+# Then work on the data
+df %>% 
+  mutate(length = end-start) %>%
+  group_by(seqname) %>%
+  summarise(mean = mean(length),
+            max = max(length),
+            min = min(length),
+            genebases = sum(length),
+            n = n())
+
+```
+
+# Report example 2
+
+```{r}
+
+# https://db.rstudio.com/getting-started/database-queries
+
+q1 <- tbl(con, "genes") %>%
+  mutate(length = end-start) %>%
+  group_by(seqname) %>%
+  summarise(mean      = mean(length),
+            median    = median(length),
+            max       = max(length),
+            min       = min(length),
+            genebases = sum(length),
+            n         = n())
+
+show_query(q1)
+
+rp <- q1 %>% 
+  tbl_df() %>%
+  {.}
+
+rp
+
+```
+

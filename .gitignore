@@ -36,3 +36,8 @@ vignettes/*.pdf
 rsconnect/
 .DS_Store
 .Rproj.user
+
+datasets/*
+
+*.gz
+*.rds
