@@ -25,13 +25,6 @@ Unzipped it is about 2 gigabytes and will probably be too large for your compute
 
 But for speed we recommend that you unzip the data - then work on the unzipped data file!
 
-```{r}
-
-unzip(zipfile = "../datasets/dataset.02.dgrp2.tgeno.zip", overwrite = T)
-dir()
-
-```
-
 
 Luckily, you have an idea on how to handle large data...
 
@@ -47,19 +40,25 @@ Hint: Do the data have column headers?
 ```{r}
 
 library(tidyverse)
-?read_lines()
 
+data_file_path = "../datasets/dgrp2.tgeno"
+
+first_10 = read_delim(data_file_path, delim = ' ', n_max = 10)
 ```
-
-
-
 
 #### Q: Now read the first 10 rows in correct format (214 variables)
 
+```{r}
+first_10
+```
 
 
 #### Q: Describe briefly the structure of the data and what the different variables mean
 
+```{r}
+first_10 %>% summary
+```
+The data represents DGRP Lines grouped by chromozones. These show the positions of genes for each chr, and other interesting stuff.
 
 # Tidy data
 
@@ -84,6 +83,11 @@ Hint: ?tidyselect::select_helpers
 #### Q: Make a function that takes your imported variants and make them tidy (call it "make_tidy")
 
 Final hint: You should get 205 rows pr. variant ;)
+
+```{r}
+tidy_data = gather(first_10, line, genotype, line_21:line_913, factor_key = TRUE)
+```
+
 
 
 #### Example of why tidy data is so nice: Calculate the amount of missing data for these two first variants
@@ -122,6 +126,61 @@ I suggest that you bin the coverage in bins of size 0-4, 5-9, 10-14, >=15
 Hint: 5 * (0:35 %/% 5)
 
 #### Q: Show, test and visualize the contingency table of genotype (0 or 2) X chr.
+
+```{r}
+
+chars     <- readLines(con = data_file_path, n = 10010)
+size10000  <- sum(nchar(chars[10:10010]))
+sizetotal <- file.size(data_file_path)
+estimated_nlines = (10000 *  sizetotal / size10000) - 10000
+
+nof_samples = 50 #5000
+sample_size = 10000
+batch_size = 1000
+xsqr_tests = vector('double', length = nof_samples)
+
+global_summary = tidy_data %>%
+  group_by(chr,genotype) %>%
+  summarise(count = n()) %>%
+  spread(key=genotype, value=count)
+
+input_connection = file(data_file_path, 'r')
+columns = names(first_10)
+  
+for (s in 1:nof_samples){
+  lines_to_read = sort(sample(2:estimated_nlines, sample_size/batch_size))
+  skip <- diff(c(1, lines_to_read)) - 1
+  
+  data = as.data.frame(setNames(replicate(214,numeric(sample_size), simplify = F), columns))
+  for (i in 1:(sample_size/batch_size)){
+    batch_data = scan(input_connection, what="", sep="\n", skip=skip[i], n=batch_size, quiet=TRUE)
+    if (length(batch_data) == 0){
+      break    
+    }
+    
+    split_batch = strsplit(batch_data, " ")
+    
+    for (iv in 1:batch_size){
+      data_index = batch_size*(i-1) + iv
+      data[data_index,] <- split_batch[[iv]]
+    }
+  }
+  
+  #Time to tidy up the data
+  local_tidy_data = gather(data, line, genotype, line_21:line_913, factor_key = TRUE)
+  summ = local_tidy_data %>%
+    group_by(chr, genotype)%>%
+    summarise(count = n()) %>%
+    spread(key=genotype, value=count)
+  
+  m = merge(global_summary, summ, all = TRUE)
+  global_summary = m %>% group_by(chr) %>% summarise('-' = sum( `-` ), '2' = sum(`2`), '0' = sum(`0`))
+}
+
+
+```
+
+
 
 #### Q: Show, test and visualize the contingency table of genotype (NA or not NA) X coverage bin.
 
