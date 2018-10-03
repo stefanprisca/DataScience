@@ -134,9 +134,9 @@ size10000  <- sum(nchar(chars[10:10010]))
 sizetotal <- file.size(data_file_path)
 estimated_nlines = (10000 *  sizetotal / size10000) - 10000
 
-nof_samples = 50 #5000
-sample_size = 10000
-batch_size = 1000
+nof_samples = 500 #5000
+sample_size = 2000
+batch_size = 100
 xsqr_tests = vector('double', length = nof_samples)
 
 global_summary = tidy_data %>%
@@ -175,14 +175,55 @@ for (s in 1:nof_samples){
   
   m = merge(global_summary, summ, all = TRUE)
   global_summary = m %>% group_by(chr) %>% summarise('-' = sum( `-` ), '2' = sum(`2`), '0' = sum(`0`))
+  
+  rm(local_tidy_data)
 }
-
 
 ```
 
+```{r}
+observed_values = global_summary[2:6, c('0', '2' )]
 
+# AFfter we hvae the data, let's test our hypothesis
+
+nof_genotypes = t(colSums(observed_values)) #%>% summary(`-` = sum(`-`), `0` = sum(`0`), `2` = sum(`2`))
+nof_chr = rowSums(observed_values)
+total = sum(observed_values)
+
+prob_genot = nof_genotypes / total
+prob_chr = nof_chr / total
+
+prob_matrix = prob_chr %*% prob_genot
+expected_values = prob_matrix * total
+
+xsqr_stats = ((observed_values - expected_values)^2)/expected_values
+
+xsqr = sum(xsqr_stats)
+
+xsqr_stats['chr'] =  global_summary[2:6, 'chr']
+
+# df = (col - 1) * (rows - 1)
+df = (5-1)*(3-1)
+
+# the P value for our null hypothesis:
+(1 - pchisq(xsqr, df = df))
+```
+
+Observation: The P value is very small. Our xsqr statistics are way off the charts. This means we can reject the null hypothesis.
 
 #### Q: Show, test and visualize the contingency table of genotype (NA or not NA) X coverage bin.
+
+```{r}
+#0-4, 5-9, 10-14, >=15
+tidy_data %>%
+  mutate(interval = cut(t(tidy_data['cov']), breaks =  c(0, 4, 9, 14, Inf)) ,
+         found = (genotype != '-')) %>%
+      group_by(interval, found)%>%
+        summarise(count = n()) %>%
+        spread(key=found, value=count)
+
+```
+
 
 These are not easy questions!
 
