@@ -1,0 +1,309 @@
+---
+title: "Data Science for Bioinformatics - Week 07"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+
+# What happens when data are normally distributed and H0 is true?
+
+Here I simulate datasets of two groups (g1 and g2) with 90 observations in g1 and 1000 observations in g2.
+
+As you can see the two populations have the same mean (mean=180) and variance (sd=10)
+
+Then I use the t.test() to test for difference in means and I plot the data.
+
+
+```{r}
+
+library(tidyverse)
+
+set.seed(0)
+
+g1 <- data.frame(group = "g1", value = rnorm(n = 90,  mean = 180, sd = 10 ))
+g2 <- data.frame(group = "g2", value = rnorm(n = 1000,  mean = 180, sd = 10 ))
+
+x <- rbind(g1,g2)
+
+t.test(formula = value ~ group, data = x)
+
+t.test(x = g1$value, y=g2$value)
+
+r <- t.test(x = g1$value, y=g2$value)
+names(r)
+r$p.value
+
+ggplot(data = x, mapping = aes(x=value, fill=group)) + geom_histogram() + facet_grid(group ~.)
+
+```
+
+Define a function to run the simulations, since we have to do it a couple times.
+
+```{r}
+group_comparison_10ksim <- function(g1_mean, g1_sd, g2_mean, g2_sd, n = 10^4, test_method = t.test){
+  set.seed(0)
+  
+  p_results <- vector('double', length = n)
+  for (i in 1:n){
+    g1 <- data.frame(group = "g1", value = rnorm(n = 90,  mean = g1_mean, sd = g1_sd ))
+    g2 <- data.frame(group = "g2", value = rnorm(n = 1000,  mean = g2_mean, sd = g2_sd ))
+    
+    x <- rbind(g1,g2)
+    
+    result <- test_method(formula = value ~ group, data = x)
+    p_results[[i]] <- result$p.value
+  }
+  result <- data.frame(p_results)
+  names(result) <- 'p'
+  return(result)
+}
+```
+
+
+
+#### Simulate 10000 different datasets where H0 is true, test them all and collect the p values.
+
+#### Q: Show the distribution of P values.
+
+```{r}
+
+p_results_true <- group_comparison_10ksim(180, 10, 180, 10)
+
+ggplot(p_results_true, aes(x = p)) + geom_histogram(bins = 100)
+
+```
+
+
+#### Q: How many FALSE POSITIVES (alpha = 0.05) ?
+```{r}
+sum(p_results_true[p_results_true < 0.05])
+```
+
+#### Q: How many FALSE NEGATIVES (alpha = 0.05) ?
+0, H0 is true always in our case so we don't have type 2 errors
+
+
+# What happens when H0 is FALSE?
+
+Now we simulate that the population g2 has a different mean (185)
+
+```{r}
+
+library(tidyverse)
+
+set.seed(0)
+
+g1 <- data.frame(group = "g1", value = rnorm(n = 90,  mean = 180, sd = 10 ))
+g2 <- data.frame(group = "g2", value = rnorm(n = 1000,  mean = 185, sd = 10 ))
+
+x <- rbind(g1,g2)
+
+t.test(x = g1$value, y=g2$value)
+
+ggplot(data = x, mapping = aes(x=value, fill=group)) + geom_histogram() + facet_grid(group ~.)
+
+```
+
+
+#### Simulate 10000 datasets where H0 is FALSE and test them all and collect the p values.
+
+Use g1 (mean=180, sd=10) and g2(mean=185, sd=10)
+
+
+#### Q: Show the distribution of P values.
+
+```{r}
+
+library(tidyverse)
+
+p_results_false = group_comparison_10ksim(180, 10, 185, 10)
+ggplot(p_results_false, aes(x = p)) + geom_histogram(bins = 100)
+
+```
+
+#### Q: How many FALSE POSITIVES (alpha = 0.05) ?
+0, H0 is false in our case.
+
+
+#### Q: How many FALSE NEGATIVES (alpha = 0.05) ?
+
+```{r}
+sum(p_results_false[p_results_false > 0.05])
+```
+
+
+# Violating assumptions - different variance as example
+
+```{r}
+
+library(tidyverse)
+
+set.seed(0)
+
+g1 <- data.frame(group = "g1", value = rnorm(n = 90,   mean=180, sd=20))
+g2 <- data.frame(group = "g2", value = rnorm(n = 1000, mean=180, sd=5))
+
+x <- rbind(g1,g2)
+
+t.test(x = g1$value, y=g2$value)
+
+ggplot(data = x, mapping = aes(x=value, fill=group)) + geom_histogram() + facet_grid(group ~.)
+
+```
+
+#### Simulate 10000 different datasets where H0 is true, test them all and collect the p values.
+
+Use g1 (mean=180, sd=20) and g2(mean=180, sd=5)
+
+#### Q: Show the distribution of P values.
+
+
+```{r}
+
+library(tidyverse)
+
+
+p_results_true_va = group_comparison_10ksim(180, 20, 180, 5)
+ggplot(p_results_true_va, aes(x = p)) + geom_histogram(bins = 100)
+
+
+```
+
+
+#### Q: How many FALSE POSITIVES (alpha = 0.05) ?
+
+```{r}
+sum(p_results_true_va[p_results_true_va < 0.05])
+```
+
+#### Q:How many FALSE NEGATIVES (alpha = 0.05) ?
+0
+
+
+#### Simulate 10000 datasets where H0 is FALSE and test them all and collect the p values.
+
+Use g1 (mean=180, sd=20) and g2(mean=185, sd=5)
+
+#### Q: Show the distribution of P values.
+
+```{r}
+
+library(tidyverse)
+
+p_results_false_va = group_comparison_10ksim(180, 20, 185, 5)
+ggplot(p_results_false_va, aes(x = p)) + geom_histogram(bins = 100)
+
+```
+
+#### Q: How many FALSE POSITIVES (alpha = 0.05) ?
+0...
+
+#### Q: How many FALSE NEGATIVES (alpha = 0.05) ?
+
+```{r}
+sum(p_results_false_va[p_results_false_va > 0.05])
+```
+
+
+# Using a non-parametric test instead (for the non-normal dataset)
+
+As as simple fix try and use the Mann Whitney U test on the last 10000 datasets where you know that H0 is actually false and should be rejected.
+
+```{r}
+
+library(tidyverse)
+
+set.seed(0)
+
+g1 <- data.frame(group = "g1", value = rnorm(n = 90,   mean=180, sd=20))
+g2 <- data.frame(group = "g2", value = rnorm(n = 1000, mean=185, sd=5))
+
+x <- rbind(g1,g2)
+
+wilcox.test(x = g1$value, y = g2$value)
+
+ggplot(data = x, mapping = aes(x=value, fill=group)) + geom_histogram() + facet_grid(group ~.)
+
+```
+
+
+#### Q: Show the distribution of P values for the Mann Whitney test.
+
+
+```{r}
+
+library(tidyverse)
+p_results_false_mw = group_comparison_10ksim(180, 20, 185, 5, test_method = wilcox.test)
+ggplot(p_results_false_mw, aes(x = p)) + geom_histogram(bins = 100)
+
+```
+
+#### Q: How many FALSE NEGATIVES (alpha = 0.05) ?
+
+```{r}
+sum(p_results_false_mw[p_results_false_mw > 0.05])
+```
+
+# Mammals dataset 
+
+We first load the dataset into a variable we call "mammals"
+
+```{r}
+
+library(tidyverse)
+
+mammals <- read_csv(file = "../datasets/dataset.01.rsbl20150010supp1.csv")
+
+```
+
+#### Q: Visualize the distribution of GC content (GC3) for X chromosome genes and autosomal genes for each species
+
+```{r}
+mammals %>% group_by(chrMark) %>% summarise(n = n())
+
+ggplot(mammals, aes(x = GC3, fill = chrMark)) + geom_histogram(bins = 100) + facet_grid(~Species)
+```
+
+
+#### Q: Test if the GC content (GC3) is the same for X chromosomal genes and autosomal genes (not X) for each species
+
+```{r}
+mammals %>% 
+  group_by(Species) %>% 
+  summarise(
+    meanX = mean(GC3[chrMark == 'X']),
+    meanA = mean(GC3[chrMark == 'A']),
+    p_value = t.test(x = GC3[chrMark == 'X'], y = GC3[chrMark == 'A'])$p.value)
+```
+A: It is not the same. Given the p values, we can reject the null hypothesis that the X genes have the same distribution as autosome genes.
+
+
+#### Q: Test if the GC content (GC3) is the same for autosomal genes (not X) in humans and chimpanzee?
+
+
+```{r}
+mammals %>% 
+  filter((Species == 'Human' | Species == 'Chimp') &  chrMark == 'A') %>% 
+  summarise(
+    mean_humans = mean(GC3[Species == 'Human']),
+    mean_chimps = mean(GC3[Species == 'Chimp']),
+    p_value = t.test(x = GC3[Species == 'Human'], y = GC3[Species == 'Chimp'])$p.value)
+```
+A: The GC3 content seems to be similar in humans and chimps. The obtained p value is high enough for us to accept the null hypothesis.
+This also makes sense given the GC3 distributions we have seen before.
+
+#### Q: Test if the GC content (GC3) is the same for autosomal genes (not X) in humans and gorilla?
+
+
+```{r}
+mammals %>% 
+  filter((Species == 'Human' | Species == 'Gori') &  chrMark == 'A') %>% 
+  summarise(
+    mean_humans = mean(GC3[Species == 'Human']),
+    mean_gori = mean(GC3[Species == 'Gori']),
+    p_value = t.test(x = GC3[Species == 'Human'], y = GC3[Species == 'Gori'])$p.value)
+```
+A: No. The null hypothesis is rejected in this case.
+
