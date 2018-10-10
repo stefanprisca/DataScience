@@ -78,7 +78,7 @@ ggplot(p_results_true, aes(x = p)) + geom_histogram(bins = 100)
 
 #### Q: How many FALSE POSITIVES (alpha = 0.05) ?
 ```{r}
-sum(p_results_true[p_results_true < 0.05])
+length(p_results_true[p_results_true < 0.05])
 ```
 
 #### Q: How many FALSE NEGATIVES (alpha = 0.05) ?
@@ -130,7 +130,7 @@ ggplot(p_results_false, aes(x = p)) + geom_histogram(bins = 100)
 #### Q: How many FALSE NEGATIVES (alpha = 0.05) ?
 
 ```{r}
-sum(p_results_false[p_results_false > 0.05])
+length(p_results_false[p_results_false > 0.05])
 ```
 
 
@@ -175,7 +175,7 @@ ggplot(p_results_true_va, aes(x = p)) + geom_histogram(bins = 100)
 #### Q: How many FALSE POSITIVES (alpha = 0.05) ?
 
 ```{r}
-sum(p_results_true_va[p_results_true_va < 0.05])
+length(p_results_true_va[p_results_true_va < 0.05])
 ```
 
 #### Q:How many FALSE NEGATIVES (alpha = 0.05) ?
@@ -203,7 +203,7 @@ ggplot(p_results_false_va, aes(x = p)) + geom_histogram(bins = 100)
 #### Q: How many FALSE NEGATIVES (alpha = 0.05) ?
 
 ```{r}
-sum(p_results_false_va[p_results_false_va > 0.05])
+length(p_results_false_va[p_results_false_va > 0.05])
 ```
 
 
@@ -243,7 +243,7 @@ ggplot(p_results_false_mw, aes(x = p)) + geom_histogram(bins = 100)
 #### Q: How many FALSE NEGATIVES (alpha = 0.05) ?
 
 ```{r}
-sum(p_results_false_mw[p_results_false_mw > 0.05])
+length(p_results_false_mw[p_results_false_mw > 0.05])
 ```
 
 # Mammals dataset 

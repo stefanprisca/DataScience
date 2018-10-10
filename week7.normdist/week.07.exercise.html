@@ -131,12 +131,12 @@ $(document).ready(function () {
 <p>As you can see the two populations have the same mean (mean=180) and variance (sd=10)</p>
 <p>Then I use the t.test() to test for difference in means and I plot the data.</p>
 <pre class="r"><code>library(tidyverse)</code></pre>
-<pre><code>## -- Attaching packages ---------------------------------------------------------------------------------------------------------------- tidyverse 1.2.1 --</code></pre>
+<pre><code>## -- Attaching packages ------------------------------------------------------------------------------------------------------------------------------------- tidyverse 1.2.1 --</code></pre>
 <pre><code>## v ggplot2 3.0.0     v purrr   0.2.5
 ## v tibble  1.4.2     v dplyr   0.7.6
 ## v tidyr   0.8.1     v stringr 1.3.1
 ## v readr   1.1.1     v forcats 0.3.0</code></pre>
-<pre><code>## -- Conflicts ------------------------------------------------------------------------------------------------------------------- tidyverse_conflicts() --
+<pre><code>## -- Conflicts ---------------------------------------------------------------------------------------------------------------------------------------- tidyverse_conflicts() --
 ## x dplyr::filter() masks stats::filter()
 ## x dplyr::lag()    masks stats::lag()</code></pre>
 <pre class="r"><code>set.seed(0)
@@ -209,8 +209,8 @@ ggplot(p_results_true, aes(x = p)) + geom_histogram(bins = 100)</code></pre>
 </div>
 <div id="q-how-many-false-positives-alpha-0.05" class="section level4">
 <h4>Q: How many FALSE POSITIVES (alpha = 0.05) ?</h4>
-<pre class="r"><code>sum(p_results_true[p_results_true &lt; 0.05])</code></pre>
-<pre><code>## [1] 12.61849</code></pre>
+<pre class="r"><code>length(p_results_true[p_results_true &lt; 0.05])</code></pre>
+<pre><code>## [1] 505</code></pre>
 </div>
 <div id="q-how-many-false-negatives-alpha-0.05" class="section level4">
 <h4>Q: How many FALSE NEGATIVES (alpha = 0.05) ?</h4>
@@ -262,8 +262,8 @@ ggplot(p_results_false, aes(x = p)) + geom_histogram(bins = 100)</code></pre>
 </div>
 <div id="q-how-many-false-negatives-alpha-0.05-1" class="section level4">
 <h4>Q: How many FALSE NEGATIVES (alpha = 0.05) ?</h4>
-<pre class="r"><code>sum(p_results_false[p_results_false &gt; 0.05])</code></pre>
-<pre><code>## [1] 6.732331</code></pre>
+<pre class="r"><code>length(p_results_false[p_results_false &gt; 0.05])</code></pre>
+<pre><code>## [1] 59</code></pre>
 </div>
 </div>
 <div id="violating-assumptions---different-variance-as-example" class="section level1">
@@ -307,8 +307,8 @@ ggplot(p_results_true_va, aes(x = p)) + geom_histogram(bins = 100)</code></pre>
 </div>
 <div id="q-how-many-false-positives-alpha-0.05-2" class="section level4">
 <h4>Q: How many FALSE POSITIVES (alpha = 0.05) ?</h4>
-<pre class="r"><code>sum(p_results_true_va[p_results_true_va &lt; 0.05])</code></pre>
-<pre><code>## [1] 12.14907</code></pre>
+<pre class="r"><code>length(p_results_true_va[p_results_true_va &lt; 0.05])</code></pre>
+<pre><code>## [1] 505</code></pre>
 </div>
 <div id="qhow-many-false-negatives-alpha-0.05" class="section level4">
 <h4>Q:How many FALSE NEGATIVES (alpha = 0.05) ?</h4>
@@ -332,8 +332,8 @@ ggplot(p_results_false_va, aes(x = p)) + geom_histogram(bins = 100)</code></pre>
 </div>
 <div id="q-how-many-false-negatives-alpha-0.05-2" class="section level4">
 <h4>Q: How many FALSE NEGATIVES (alpha = 0.05) ?</h4>
-<pre class="r"><code>sum(p_results_false_va[p_results_false_va &gt; 0.05])</code></pre>
-<pre><code>## [1] 826.762</code></pre>
+<pre class="r"><code>length(p_results_false_va[p_results_false_va &gt; 0.05])</code></pre>
+<pre><code>## [1] 3499</code></pre>
 </div>
 </div>
 <div id="using-a-non-parametric-test-instead-for-the-non-normal-dataset" class="section level1">
@@ -367,8 +367,8 @@ ggplot(p_results_false_mw, aes(x = p)) + geom_histogram(bins = 100)</code></pre>
 </div>
 <div id="q-how-many-false-negatives-alpha-0.05-3" class="section level4">
 <h4>Q: How many FALSE NEGATIVES (alpha = 0.05) ?</h4>
-<pre class="r"><code>sum(p_results_false_mw[p_results_false_mw &gt; 0.05])</code></pre>
-<pre><code>## [1] 679.1256</code></pre>
+<pre class="r"><code>length(p_results_false_mw[p_results_false_mw &gt; 0.05])</code></pre>
+<pre><code>## [1] 2311</code></pre>
 </div>
 </div>
 <div id="mammals-dataset" class="section level1">
