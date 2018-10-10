@@ -1,0 +1,216 @@
+---
+title: "Data Science for Bioinformatics"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+# Midterm project on "Drosophila melanogaster Genetic Reference Panel""
+
+Reference paper describes the data obtained here. 
+
+Paper source: The Drosophila melanogaster Genetic Reference Panel, Nature 2012
+
+Data source  
+
+ * http://dgrp2.gnets.ncsu.edu/  (the project)
+ * http://dgrp2.gnets.ncsu.edu/data.html  (the data source tabular 3)
+ 
+Tabular formatted genotype (space delimited, 0 = ref allele, 2 = alt allele (not necessarily minor), - = missing)
+
+A zipped version of the data is available in the datasets folder.
+
+Unzipped it is about 2 gigabytes and will probably be too large for your computers memory.
+
+But for speed we recommend that you unzip the data - then work on the unzipped data file!
+
+# Questions on the DRGP dataset
+
+## For the entire report we only focus on variants located on chromosome 3L.
+
+#### Q: Unzip the data, extract all variants located on the chromosome and save the data (write_rds)
+
+
+```{r}
+
+library(tidyverse)
+
+# The file is already unzipped.
+# unzip(zipfile = "../datasets/dataset.02.dgrp2.tgeno.zip", overwrite = T)
+i <- 0
+
+f <- function(df, pos) {
+  tt <- df %>% 
+    mutate(#covbin = 5* (cov %/% 5),                                    # make bins of coverage
+           chromosome = str_sub(chr, start=1, end=1)) %>%              # extract chromosome
+    gather(key = "line", value = "genotype", starts_with("line")) %>%  # make tidy format
+    filter(chromosome == '3L') %>%
+    {.}
+  
+  cat("Position", pos, "Time:", as.character(Sys.time()), "\n", file = "test.log", append = TRUE) # Log progress to log file
+  
+  return(tt)
+}
+
+df <- read_delim_chunked(file = "../datasets/dgrp2.tgeno", 
+                         callback = ListCallback$new(f), 
+                         chunk_size = 100000, guess_max = 100,
+                         col_names = T, delim = " ", comment = "#",
+                         progress = T)
+
+
+#df <- bind_rows(df)
+
+```
+
+#### Q: How many variants do you have ?
+
+
+```{r}
+```
+
+#### Q: Report how many variants have less than 90% of the lines genotyped.
+
+
+```{r}
+```
+
+
+#### Q: Report how many variants have less than 95% of the lines genotyped.
+
+```{r}
+```
+
+#### Q: Extract variants that are genotyped in at least 95% of the lines.
+
+```{r}
+```
+
+#### Q: Visualize the distribution of variant minor allele frequencies
+
+```{r}
+```
+
+#### Q: Visualize how the maf changes along the chromosome position
+
+```{r}
+```
+
+
+#### Q: Visualize the distribution of coverage of variants ("cov") that are genotyped in at least 95% of the lines
+
+```{r}
+```
+
+
+#### Q: Visualize how the coverage changes along the chromosome position
+
+```{r}
+```
+
+#### Q: How many loci are there of each type of variant in your dataset?
+
+HINT: ?stringr::str_split_fixed and look at the "id" column
+
+INSertions, DELetions, Multiple Nucleotide Polymorphism, Single Nucleotide Polymorphism
+
+
+```{r}
+```
+
+#### Q: How many rare and common variants are there?
+
+We define a variant as either rare (minor allele frequency < 0.05) or common (minor allele frequency >= 0.05).
+
+```{r}
+```
+
+#### Q: Is there a statistical association between the different types of variants and the rare/common variants?
+
+Do you think one of the variant classes have more rare alleles than other classes?
+
+```{r}
+```
+
+
+#### Q: If coverage was homogenous throughout the genome (by that we mean that on average the coverage is the same for any given position), what probability distribution is expected to capture well the coverage? 
+
+
+#### Q: Make goodness of fit test of the coverage data of your variants on chromosome 3L: is the theoretical distribution you just proposed a good fit for the data?
+
+```{r}
+
+```
+
+
+# From now on you should focus on a smaller region of chromosome 3L
+
+#### Q: Pick a starting point on chromosome 3L and extract/slice 20000 SNPs downstream of that position. What is the range of the positions?
+
+So only pick 20000 SNPS. Ignore INSertions, DELetions, and MNPs.
+
+```{r}
+```
+
+#### Q: Calculate the r squared association between each pair of neighboring SNPS (this association is also called "linkage disequilibrium")
+
+In population genetics, linkage disequilibrium is the non-random association of alleles at different loci in a given population.
+
+Loci are said to be in linkage disequilibrium when the frequency of association of their different alleles is higher or lower than what would be expected if the loci were independent and associated randomly.
+
+You should calculate the $r^2$ measure of linkage disequilibrium, which is defined as:
+
+\begin{equation}
+
+r^2(p_a,p_b,p_{ab}) = \frac{(p_{ab}−p_a \cdot p_b)^2}{ p_a \cdot (1−p_a) \cdot p_b\cdot(1−p_b)}
+
+\end{equation}
+
+where $p_a$ is the frequency of allele $a$ at locus 1, $p_b$ is the frequency of allele $b$ at locus 2 and $p_{ab}$ is the frequency of haplotypes having allele $a$ at locus 1 and allele $b$ at locus 2 (Hill & Robertson, 1968).
+
+Read more at wikipedia (if you like).
+
+HINT: ?lead, tidy data
+HINT: only use cases where both SNPs are genotyped in the line (i.e. 0 or 2)
+
+```
+# A tibble: 3,953,818 x 14
+   chr      pos id            ref   alt    refc  altc  qual   cov snptype line     genotype genotype2 haplotype
+   <chr>  <int> <chr>         <chr> <chr> <int> <int> <int> <int> <chr>   <chr>    <chr>    <chr>     <chr>    
+ 1 3L    100250 3L_100250_SNP A     G       179    14   999    24 SNP     line_100 0        0         0 0      
+ 2 3L    100256 3L_100256_SNP A     C       202     3   999    24 SNP     line_100 0        0         0 0      
+ 3 3L    100274 3L_100274_SNP G     T       184    16   999    24 SNP     line_100 0        0         0 0      
+ 4 3L    100365 3L_100365_SNP C     A       203     1   999    30 SNP     line_100 0        0         0 0      
+ 5 3L    100424 3L_100424_SNP T     A       204     1   999    31 SNP     line_100 0        0         0 0      
+ 6 3L    100626 3L_100626_SNP A     T       204     1   999    35 SNP     line_100 0        2         0 2      
+ 7 3L    100728 3L_100728_SNP T     A        78   123   999    33 SNP     line_100 2        0         2 0      
+ 8 3L    100731 3L_100731_SNP C     A       203     2   999    34 SNP     line_100 0        0         0 0      
+ 9 3L    100858 3L_100858_SNP C     G       203     1   999    32 SNP     line_100 0        0         0 0      
+10 3L    100876 3L_100876_SNP G     C       204     1   999    31 SNP     line_100 0        0         0 0      
+# ... with 3,953,808 more rows
+
+```
+
+ 
+
+```{r}
+```
+
+#### Q: Summarize average LD in distance bins and visualize how LD varies with the physical distance beween SNPs (measured in bp)
+
+HINT: 
+
+```
+
+dist <- 1:200
+ifelse(dist > 10, 5 + 10 * dist %/% 10, dist )
+
+```
+
+```{r}
+```
+
+#### Q: Compare and discuss with the Fig 1 of the paper.
+  
+

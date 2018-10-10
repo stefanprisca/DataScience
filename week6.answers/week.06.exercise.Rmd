@@ -1,0 +1,201 @@
+---
+title: "Data Science for Bioinformatics"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+# Drosophila melanogaster Genetic Reference Panel
+
+Reference paper describes the data obtained here. 
+
+Paper source: The Drosophila melanogaster Genetic Reference Panel, Nature 2012
+
+Data source  
+
+ * http://dgrp2.gnets.ncsu.edu/  (the project)
+ * http://dgrp2.gnets.ncsu.edu/data.html  (the data source tabular 3)
+ 
+Tabular formatted genotype (space delimited, 0 = ref allele, 2 = alt allele (not necessarily minor), - = missing)
+
+A zipped version of the data is available in the datasets folder.
+
+Unzipped it is about 2 gigabytes and will probably be too large for your computers memory.
+
+But for speed we recommend that you unzip the data - then work on the unzipped data file!
+
+```{r}
+
+unzip(zipfile = "../datasets/dataset.02.dgrp2.tgeno.zip", overwrite = T)
+dir()
+
+```
+
+
+Luckily, you have an idea on how to handle large data...
+
+#### Q: Read the first 2 rows and inspect them 
+
+Hint: ?read_lines()
+
+Hint: Are these data tab, comma or space separated?
+
+Hint: Do the data have column headers?
+
+
+```{r}
+
+library(tidyverse)
+?read_lines()
+
+```
+
+
+
+
+#### Q: Now read the first 10 rows in correct format (214 variables)
+
+
+
+#### Q: Describe briefly the structure of the data and what the different variables mean
+
+
+# Tidy data
+
+One dataset, the tidy dataset, will be much easier to work with inside the tidyverse.
+
+There are three interrelated rules which make a dataset tidy:
+
+ * Each variable must have its own column.
+ * Each observation must have its own row.
+ * Each value must have its own cell.
+
+#### Q: Discuss how this dataset should be organized to be in "tidy" format.
+
+When you all agree then try and make a tidy dataset for the first 10 variants only.
+
+Hint: genotype is a single variable, there is one genotype pr. variants pr. line
+
+Hint: ?gather()
+
+Hint: ?tidyselect::select_helpers
+
+#### Q: Make a function that takes your imported variants and make them tidy (call it "make_tidy")
+
+Final hint: You should get 205 rows pr. variant ;)
+
+
+#### Example of why tidy data is so nice: Calculate the amount of missing data for these two first variants
+
+Hopefully you will realize this is easy, once the data are in tidy format.
+
+Then you can do stuff like this:
+
+
+```{r eval=FALSE}
+
+tidy_data %>%
+  group_by(id,genotype) %>%
+  summarise(count = n()) %>%
+  spread(key=genotype, value=count) %>%
+  {.}
+
+```
+
+# Testing genotyping succes
+
+I have two hypotheses:
+
+# 1. All chromosomes have the same distribution of genotypes
+
+Here you should test the NULL hypothesis that the three genotype, ref, alt or missing is independent of which chromosome we are looking at.
+
+HINT: ?stringr::str_sub
+
+# 2. Genotyping success is dependent on coverage (cov), low coverage have more problems in genotyping.
+
+Here we hypothesize that low coverage variants have more NA's than high coverage variants.
+
+I suggest that you bin the coverage in bins of size 0-4, 5-9, 10-14, >=15
+
+Hint: 5 * (0:35 %/% 5)
+
+#### Q: Show, test and visualize the contingency table of genotype (0 or 2) X chr.
+
+#### Q: Show, test and visualize the contingency table of genotype (NA or not NA) X coverage bin.
+
+These are not easy questions!
+
+Hint: you should UNZIP the data, otherwise R will use a lot of memory for reading and unzipping in memory.
+
+#### Example 9.4 to the rescue!
+
+For testing, use chisq.test() - and make sure you do it correctly. First you should redo example 9.4 and check that you can get the same results.
+
+Here is some help:
+
+```{r example_9.4 }
+
+x1 <- data.frame("eaten"    = rep("Eaten by birds", 3),
+                "infection" = c("Uninfected", "Lightly infected", "Highly infected"),
+                "count"     = c(1,10,37))
+
+x2 <- data.frame("eaten"    = rep("Not eaten by birds", 3),
+                "infection" = c("Uninfected", "Lightly infected", "Highly infected"),
+                "count"     = c(49,35,9))
+
+x <- rbind(x1,x2)
+rm(x1,x2)
+
+xt <- x %>% 
+  spread(key=infection, value=count, fill=0) %>%
+  data.frame()
+
+rownames(xt) <- xt$eaten
+xt <- xt %>% select(-eaten) %>% as.matrix()
+
+knitr::kable(addmargins(xt))
+
+```
+
+
+```{r}
+
+chisq.test(x=xt, correct = F)
+
+```
+
+
+```{r}
+
+worm <- read_csv(file="http://www.zoology.ubc.ca/~schluter/WhitlockSchluter/wp-content/data/chapter09/chap09e4WormGetsBird.csv")
+
+print(worm)
+chisq.test(x = worm$infection, y=worm$fate, correct = F)
+
+```
+
+```{r}
+
+knitr::kable(addmargins(table(worm$infection, worm$fate)))
+chisq.test(x = table(worm$infection, worm$fate), correct=F)
+
+```
+
+You should also visualize the contingency tables, something like figure 9.4-1
+
+HINT: geom_mosaic() from the package ggmosaic - or http://whitlockschluter.zoology.ubc.ca/r-code/rcode09
+
+For both questions, you should be ready to present your approach, results and conclusions.
+
+
+# Getting my disk space back
+
+```{r}
+
+# Delete the unzipped file when everything is done
+unlink("dgrp2.tgeno", force = TRUE)
+
+```
+
