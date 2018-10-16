@@ -38,85 +38,137 @@ library(tidyverse)
 
 # The file is already unzipped.
 # unzip(zipfile = "../datasets/dataset.02.dgrp2.tgeno.zip", overwrite = T)
-i <- 0
 
 f <- function(df, pos) {
+  #print(df)
+  
   tt <- df %>% 
-    mutate(#covbin = 5* (cov %/% 5),                                    # make bins of coverage
-           chromosome = str_sub(chr, start=1, end=1)) %>%              # extract chromosome
-    gather(key = "line", value = "genotype", starts_with("line")) %>%  # make tidy format
-    filter(chromosome == '3L') %>%
+    #gather(key = "line", value = "genotype", starts_with("line")) %>%  # make tidy format
+    filter(chr == '3L') %>%
     {.}
+  # print(tt)
+  #For now, just store some values in a different file.
+  write_csv(tt, "../datasets/dgrp2.3L", append = TRUE) # Log progress to log file
   
-  cat("Position", pos, "Time:", as.character(Sys.time()), "\n", file = "test.log", append = TRUE) # Log progress to log file
+  remove(tt)
+  #readline(prompt="Press [enter] to continue")
   
-  return(tt)
+  return(data.frame())
 }
 
-df <- read_delim_chunked(file = "../datasets/dgrp2.tgeno", 
+data_file_path = "../datasets/dgrp2.tgeno"
+
+first_2 = read_delim(data_file_path, delim = ' ', n_max = 2)
+
+df_ <- read_delim_chunked(file = data_file_path, 
                          callback = ListCallback$new(f), 
-                         chunk_size = 100000, guess_max = 100,
-                         col_names = T, delim = " ", comment = "#",
+                         chunk_size = 50000, guess_max = 100,
+                         col_names = names(first_2), delim = " ", comment = "#", #
+                         skip = 2000000,
                          progress = T)
 
-
-#df <- bind_rows(df)
-
 ```
+
+
 
 #### Q: How many variants do you have ?
 
 
 ```{r}
+data_file_path_3L = "../datasets/dgrp2.3L"
+data_3L = read_csv(data_file_path_3L)
+
+length(data_3L)
 ```
 
 #### Q: Report how many variants have less than 90% of the lines genotyped.
 
 
 ```{r}
+data_file_path_3L = "../datasets/dgrp2.3L"
+data_3L = read_csv(data_file_path_3L)
+
+data_3L_g = data_3L %>% 
+  gather(key = "line", value = "genotype", starts_with("line")) %>% 
+  group_by(id)
+
+genotyped_summ = data_3L_g %>% 
+  summarise(genotyped = length(genotype[genotype != '-']) / length(genotype))
+
+
+genotyped_data = data_3L 
+genotyped_data['genotyped'] = genotyped_summ[2]
+
+count(genotyped_data, genotyped < 0.9)
 ```
 
 
 #### Q: Report how many variants have less than 95% of the lines genotyped.
 
 ```{r}
+count(genotyped_data, genotyped < 0.95)
 ```
 
 #### Q: Extract variants that are genotyped in at least 95% of the lines.
 
 ```{r}
+genotyped_95 = genotyped_data %>% filter(genotyped >= 0.95)
 ```
 
 #### Q: Visualize the distribution of variant minor allele frequencies
 
 ```{r}
+maf_per_variant =  data_3L_g %>% 
+  summarise(maf = length(genotype[genotype == '2']) / length(genotype[genotype != '-']))
+
+ggplot(maf_per_variant, aes(maf)) + geom_density()
+
 ```
 
 #### Q: Visualize how the maf changes along the chromosome position
 
 ```{r}
+maf_per_line = data_3L_g %>%
+  group_by(line) %>%
+  summarise(maf = length(genotype[genotype == '2']) / length(genotype[genotype != '-']))
+
+ggplot(maf_per_line, aes(x = line, y = maf)) + geom_col()
 ```
 
 
 #### Q: Visualize the distribution of coverage of variants ("cov") that are genotyped in at least 95% of the lines
 
 ```{r}
+ggplot(genotyped_95, aes(cov)) + geom_density()
 ```
 
 
 #### Q: Visualize how the coverage changes along the chromosome position
 
 ```{r}
+cov_per_line = data_3L_g %>%
+  group_by(line) %>%
+  summarise(cov_l = mean(cov))
+
+ggplot(cov_per_line, aes(x = line, y = cov_l)) + geom_col()
 ```
 
 #### Q: How many loci are there of each type of variant in your dataset?
 
 HINT: ?stringr::str_split_fixed and look at the "id" column
 
+These are the variant types:
 INSertions, DELetions, Multiple Nucleotide Polymorphism, Single Nucleotide Polymorphism
 
 
 ```{r}
+data_3L_varc = data_3L
+data_3L_varc['var_class'] = str_split_fixed(data_3L['id'][[1]], "_", 3)[,3]
+data_3L_varc['maf'] = maf_per_variant[2]
+
+data_3L_varc %>%
+  group_by(var_class) %>%
+  summarise(n_loci = length(unique(pos)))
 ```
 
 #### Q: How many rare and common variants are there?
@@ -124,25 +176,63 @@ INSertions, DELetions, Multiple Nucleotide Polymorphism, Single Nucleotide Polym
 We define a variant as either rare (minor allele frequency < 0.05) or common (minor allele frequency >= 0.05).
 
 ```{r}
+maf_per_variant %>% count(maf < 0.05)
 ```
 
 #### Q: Is there a statistical association between the different types of variants and the rare/common variants?
 
 Do you think one of the variant classes have more rare alleles than other classes?
 
+A:
+For each variant class VC:
+  H0: VC does not have more rare alleles than other classes
+  HA: 'GREATER': VC has more alleles than other classes.
+
 ```{r}
+
+data_3L_varc %>%
+  group_by(var_class) %>%
+  summarise(vc = var_class[1],
+            vc_rare = length(maf[maf<0.05]),
+            vc_total = length(maf),
+            other_rare = length((data_3L_varc %>% filter(var_class != vc & maf < 0.05))$maf),
+            other_total = length((data_3L_varc %>% filter(var_class != vc))$maf),
+            probr_vc = vc_rare / vc_total,
+            probr_other = other_rare / other_total,
+            p_value = binom.test(vc_rare, vc_total, p = probr_other, alternative = 'greater')[['p.value']])
 ```
 
 
 #### Q: If coverage was homogenous throughout the genome (by that we mean that on average the coverage is the same for any given position), what probability distribution is expected to capture well the coverage? 
-
+Poisson distribution
 
 #### Q: Make goodness of fit test of the coverage data of your variants on chromosome 3L: is the theoretical distribution you just proposed a good fit for the data?
 
 ```{r}
+cov_freq = data_3L %>% group_by(cov) %>% summarise(n = n())
+c1 = data.frame(1, sum(cov_freq[1:11,]$n))
+names(c1) = names(cov_freq)
+c2 = data.frame(49, sum(cov_freq[45:63,]$n))
+names(c2) = names(cov_freq)
+c3 = merge(c1, cov_freq[12:44,], all = TRUE)
+cov_freq = merge(c3, c2, all = TRUE)
+
+total_cov = sum(cov_freq$n)
+mean_cov = sum(cov_freq$cov * cov_freq$n) / total_cov
+poisson_probs = (exp(1)^-mean_cov * mean_cov^cov_freq$cov)/factorial(cov_freq$cov) 
+expected_cp = total_cov * poisson_probs
+
+#We need to group them a bit. the expected are too small
+expected_cp = #c(sum(expected_cp[1:2]), expected_cp[11:49], sum(expected_cp[50:63]))
+observed_cp = cov_freq$n #c(sum(cov_freq$n[1:10]), cov_freq$n[11:49], sum(cov_freq$n[50:63]))
+
+
+xsqr_stat = sum(((observed_cp - expected_cp)^2) / expected_cp)
+df = length(observed_cp) - 2
+mean(1 - pchisq(xsqr_stat, df = df))
 
 ```
-
+Yes. Aparently the poison distribution is a perfect match for our data, as long as we group the positions such that none of the resulting categories has low frequencies (meeting the requirements for the chi2 test).
 
 # From now on you should focus on a smaller region of chromosome 3L
 
