@@ -241,6 +241,11 @@ Yes. Aparently the poison distribution is a perfect match for our data, as long 
 So only pick 20000 SNPS. Ignore INSertions, DELetions, and MNPs.
 
 ```{r}
+end_pos = median(data_3L_varc$pos)
+snps_3L = (data_3L_varc %>% filter(pos < end_pos & var_class == 'SNP'))[1:20000,]
+
+summary(snps_3L$pos)
+
 ```
 
 #### Q: Calculate the r squared association between each pair of neighboring SNPS (this association is also called "linkage disequilibrium")
@@ -285,6 +290,25 @@ HINT: only use cases where both SNPs are genotyped in the line (i.e. 0 or 2)
  
 
 ```{r}
+snps_3L_g = snps_3L %>% 
+  gather(key = "line", value = "genotype", starts_with("line")) %>%
+  filter(genotype != '-')
+
+snps_3L_g['genotype2'] = lead(snps_3L_g$genotype, 1)
+snps_3L_g = snps_3L_g %>% mutate(haplotype = paste(genotype, genotype2, sep = ' '))
+```
+
+```{r}
+
+r2_summ = snps_3L_g %>%
+  group_by(pos) %>%
+  summarise(
+    p0 = length(genotype[genotype == '0'])/length(line),
+    p2 = length(genotype2[genotype2 == '2'])/length(line),
+    p02 = length(haplotype[haplotype == '0 2'])/length(line),
+    r2 = ((p02 - (p0 * p2))^2) / (p0*(1-p0)*p2*(1-p2))
+  )
+
 ```
 
 #### Q: Summarize average LD in distance bins and visualize how LD varies with the physical distance beween SNPs (measured in bp)
@@ -299,6 +323,18 @@ ifelse(dist > 10, 5 + 10 * dist %/% 10, dist )
 ```
 
 ```{r}
+bp = lead(r2_summ$pos, 1) - r2_summ$pos
+
+r2_summ['bp'] = bp
+
+r2_vs_dist = r2_summ %>%
+  group_by(bp) %>%
+  filter(bp < 1000) %>% # there is a 5000 distance in my data, which makes a mess of the graph....
+  summarise(bpg = mean(5 + 10 * bp %/% 10), r2g = mean(r2, na.rm = TRUE)) %>%
+  group_by(bpg) %>%
+  summarise(r2g = mean(r2g, na.rm = TRUE))
+
+ggplot(r2_vs_dist, aes(x = bpg, y = r2g)) + geom_line()
 ```
 
 #### Q: Compare and discuss with the Fig 1 of the paper.
