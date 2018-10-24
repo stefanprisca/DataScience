@@ -32,7 +32,7 @@ But for speed we recommend that you unzip the data - then work on the unzipped d
 #### Q: Unzip the data, extract all variants located on the chromosome and save the data (write_rds)
 
 
-```{r}
+```
 
 library(tidyverse)
 
@@ -187,7 +187,7 @@ For each variant class VC:
 
 ```{r}
 data_3L_varc['maf'] = maf_per_variant['maf']
-data_3L_varc %>%
+pval_res = data_3L_varc %>%
   group_by(var_class) %>%
   summarise(vc = var_class[1],
             vc_rare = length(maf[maf<0.05]),
@@ -197,6 +197,10 @@ data_3L_varc %>%
             probr_vc = vc_rare / vc_total,
             probr_other = other_rare / other_total,
             p_value = binom.test(vc_rare, vc_total, p = probr_other, alternative = 'greater')[['p.value']])
+```
+A: We can see that INS and SNP are the ones that fit the null hypothesis. Del and MNP have more lower alleles:
+```{r}
+data.frame(pval_res$vc, pval_res$p_value)
 ```
 
 
@@ -239,7 +243,7 @@ Yes. Aparently the poison distribution is a perfect match for our data, as long 
 
 So only pick 20000 SNPS. Ignore INSertions, DELetions, and MNPs.
 
-```{r}
+```
 end_pos = median(data_3L$pos)
 
 f <- function(df, pos) {
@@ -268,7 +272,7 @@ df_ <- read_delim_chunked(file = data_file_path,
                          progress = T)
 
 df_ <- bind_rows(df_)
-snps_3L <- df_[1:20000,]
+snps_3L <- df_
 
 ```
 
@@ -326,9 +330,9 @@ snps_3L = snps_3L %>% mutate(haplotype = paste(genotype, genotype2, sep = ' '))
 r2_summ = snps_3L %>%
   group_by(pos) %>%
   summarise(
-    p0 = length(genotype[genotype == '0'])/length(genotype),
-    p2 = length(genotype2[genotype2 == '2'])/length(genotype),
-    p02 = length(haplotype[haplotype == '0 2'])/length(genotype),
+    p0 = length(genotype[genotype == '2'])/length(genotype),
+    p2 = length(genotype2[genotype2 == '2'])/length(genotype2),
+    p02 = length(haplotype[haplotype == '2 2'])/length(haplotype),
     r2 = ((p02 - (p0 * p2))^2) / (p0*(1-p0)*p2*(1-p2))
   )
 
@@ -351,15 +355,15 @@ bp = lead(r2_summ$pos, 1) - r2_summ$pos
 r2_summ['bp'] = bp
 
 r2_vs_dist = r2_summ %>%
-  group_by(bp) %>%
-  filter(bp < 1000) %>% # there is a 5000 distance in my data, which makes a mess of the graph....
-  summarise(bpg = mean(5 + 10 * bp %/% 10), r2g = mean(r2, na.rm = TRUE)) %>%
+  mutate(bpg = 50 + 100 * bp %/% 100) %>%
   group_by(bpg) %>%
-  summarise(r2g = mean(r2g, na.rm = TRUE))
+  summarise(r2g = mean(r2, na.rm = TRUE))
 
-ggplot(r2_vs_dist, aes(x = bpg, y = r2g)) + geom_line()
+ggplot(r2_vs_dist, aes(x = log10(bpg), y = r2g)) + geom_line()
+
+  
 ```
 
 #### Q: Compare and discuss with the Fig 1 of the paper.
   
-
+Running the computations on all the 3L SNP variants that appea on lower positions in the chromozome, we see similar results as the ones obtained in the paper. The LD has a logarithmic decrease with respect to the physical distances between variants.
