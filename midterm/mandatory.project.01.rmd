@@ -43,17 +43,12 @@ f <- function(df, pos) {
   #print(df)
   
   tt <- df %>% 
-    #gather(key = "line", value = "genotype", starts_with("line")) %>%  # make tidy format
+    select(-c(starts_with('line'))) %>%
     filter(chr == '3L') %>%
     {.}
-  # print(tt)
-  #For now, just store some values in a different file.
-  write_csv(tt, "../datasets/dgrp2.3L", append = TRUE) # Log progress to log file
+  #write_csv(tt, "../datasets/dgrp2.3L", append = TRUE) # Log progress to log file
   
-  remove(tt)
-  #readline(prompt="Press [enter] to continue")
-  
-  return(data.frame())
+  return(tt)
 }
 
 data_file_path = "../datasets/dgrp2.tgeno"
@@ -63,10 +58,13 @@ first_2 = read_delim(data_file_path, delim = ' ', n_max = 2)
 df_ <- read_delim_chunked(file = data_file_path, 
                          callback = ListCallback$new(f), 
                          chunk_size = 50000, guess_max = 100,
-                         col_names = names(first_2), delim = " ", comment = "#", #
-                         skip = 2000000,
+                         col_names = T, delim = " ", comment = "#",
                          progress = T)
+data_3L = bind_rows(df_)
 
+data_3L = data_3L %>% mutate(
+  total_l = 205
+)
 ```
 
 
@@ -75,51 +73,40 @@ df_ <- read_delim_chunked(file = data_file_path,
 
 
 ```{r}
-data_file_path_3L = "../datasets/dgrp2.3L"
-data_3L = read_csv(data_file_path_3L)
-
-length(data_3L)
+summary(data_3L)
 ```
+
+A: 1001554
 
 #### Q: Report how many variants have less than 90% of the lines genotyped.
 
 
 ```{r}
-data_file_path_3L = "../datasets/dgrp2.3L"
-data_3L = read_csv(data_file_path_3L)
 
-data_3L_g = data_3L %>% 
-  gather(key = "line", value = "genotype", starts_with("line")) %>% 
-  group_by(id)
+genotyped_data = data_3L %>%
+  mutate(genotyped_p = (refc + altc) / total_l)
 
-genotyped_summ = data_3L_g %>% 
-  summarise(genotyped = length(genotype[genotype != '-']) / length(genotype))
-
-
-genotyped_data = data_3L 
-genotyped_data['genotyped'] = genotyped_summ[2]
-
-count(genotyped_data, genotyped < 0.9)
+count(genotyped_data, genotyped_p < 0.9)
 ```
 
 
 #### Q: Report how many variants have less than 95% of the lines genotyped.
 
 ```{r}
-count(genotyped_data, genotyped < 0.95)
+count(genotyped_data, genotyped_p < 0.95)
 ```
 
 #### Q: Extract variants that are genotyped in at least 95% of the lines.
 
 ```{r}
-genotyped_95 = genotyped_data %>% filter(genotyped >= 0.95)
+genotyped_95 = genotyped_data %>% filter(genotyped_p >= 0.95)
 ```
 
 #### Q: Visualize the distribution of variant minor allele frequencies
 
 ```{r}
-maf_per_variant =  data_3L_g %>% 
-  summarise(maf = length(genotype[genotype == '2']) / length(genotype[genotype != '-']))
+maf_per_variant =  data_3L %>% 
+  mutate(maf = altc / total_l)
 
 ggplot(maf_per_variant, aes(maf)) + geom_density()
 
@@ -128,11 +115,18 @@ ggplot(maf_per_variant, aes(maf)) + geom_density()
 #### Q: Visualize how the maf changes along the chromosome position
 
 ```{r}
-maf_per_line = data_3L_g %>%
-  group_by(line) %>%
-  summarise(maf = length(genotype[genotype == '2']) / length(genotype[genotype != '-']))
+maf_per_pos = maf_per_variant %>%
+  group_by(pos) %>%
+  summarise(maf = mean(maf))
 
-ggplot(maf_per_line, aes(x = line, y = maf)) + geom_col()
+bucket_cov = 10^5
+
+binned_maf_per_pos = maf_per_pos %>%
+  mutate(bucket = bucket_cov * pos%/%bucket_cov) %>%
+  group_by(bucket) %>%
+  summarise(maf = mean(maf))
+
+ggplot(binned_maf_per_pos, aes(x = bucket, y = maf)) + geom_line()
 ```
 
 
@@ -146,11 +140,15 @@ ggplot(genotyped_95, aes(cov)) + geom_density()
 #### Q: Visualize how the coverage changes along the chromosome position
 
 ```{r}
-cov_per_line = data_3L_g %>%
-  group_by(line) %>%
+
+bucket_cov = 10^5
+
+cov_per_pos = data_3L %>%
+  mutate(bucket = bucket_cov * pos%/%bucket_cov) %>%
+  group_by(bucket) %>%
   summarise(cov_l = mean(cov))
 
-ggplot(cov_per_line, aes(x = line, y = cov_l)) + geom_col()
+ggplot(cov_per_pos, aes(x = bucket, y = cov_l)) + geom_line()
 ```
 
 #### Q: How many loci are there of each type of variant in your dataset?
@@ -164,7 +162,6 @@ INSertions, DELetions, Multiple Nucleotide Polymorphism, Single Nucleotide Polym
 ```{r}
 data_3L_varc = data_3L
 data_3L_varc['var_class'] = str_split_fixed(data_3L['id'][[1]], "_", 3)[,3]
-data_3L_varc['maf'] = maf_per_variant[2]
 
 data_3L_varc %>%
   group_by(var_class) %>%
@@ -189,7 +186,7 @@ For each variant class VC:
   HA: 'GREATER': VC has more alleles than other classes.
 
 ```{r}
-
+data_3L_varc['maf'] = maf_per_variant['maf']
 data_3L_varc %>%
   group_by(var_class) %>%
   summarise(vc = var_class[1],
@@ -231,6 +228,8 @@ xsqr_stat = sum(((observed_cp - expected_cp)^2) / expected_cp)
 df = length(observed_cp) - 2
 mean(1 - pchisq(xsqr_stat, df = df))
 
+ggplot() + geom_line(mapping = aes(x = 1:35, y = expected_cp)) +
+   geom_point(mapping = aes(x = 1:35, y = observed_cp), color = 'green')
 ```
 Yes. Aparently the poison distribution is a perfect match for our data, as long as we group the positions such that none of the resulting categories has low frequencies (meeting the requirements for the chi2 test).
 
@@ -241,10 +240,35 @@ Yes. Aparently the poison distribution is a perfect match for our data, as long 
 So only pick 20000 SNPS. Ignore INSertions, DELetions, and MNPs.
 
 ```{r}
-end_pos = median(data_3L_varc$pos)
-snps_3L = (data_3L_varc %>% filter(pos < end_pos & var_class == 'SNP'))[1:20000,]
+end_pos = median(data_3L$pos)
 
-summary(snps_3L$pos)
+f <- function(df, pos) {
+  #print(df)
+  
+  tt <- df[1:1000,] %>% 
+    filter(chr == '3L' & pos < end_pos) %>%
+    gather(key = "line", value = "genotype", starts_with("line")) %>%
+    filter(genotype != '-') %>%
+  {.}
+  
+  tt['var_class'] = str_split_fixed(tt['id'][[1]], "_", 3)[,3]
+  #write_csv(tt, "../datasets/dgrp2.3L", append = TRUE) # Log progress to log file
+  tt_res = tt %>% filter(var_class == 'SNP')
+  return(tt_res)
+}
+
+data_file_path = "../datasets/dgrp2.tgeno"
+
+first_2 = read_delim(data_file_path, delim = ' ', n_max = 2)
+
+df_ <- read_delim_chunked(file = data_file_path, 
+                         callback = ListCallback$new(f), 
+                         chunk_size = 50000, guess_max = 100,
+                         col_names = T, delim = " ", comment = "#",
+                         progress = T)
+
+df_ <- bind_rows(df_)
+snps_3L <- df_[1:20000,]
 
 ```
 
@@ -290,22 +314,21 @@ HINT: only use cases where both SNPs are genotyped in the line (i.e. 0 or 2)
  
 
 ```{r}
-snps_3L_g = snps_3L %>% 
-  gather(key = "line", value = "genotype", starts_with("line")) %>%
-  filter(genotype != '-')
 
-snps_3L_g['genotype2'] = lead(snps_3L_g$genotype, 1)
-snps_3L_g = snps_3L_g %>% mutate(haplotype = paste(genotype, genotype2, sep = ' '))
+snps_3L['genotype2'] = lead(snps_3L$genotype, 1)
+snps_3L = snps_3L %>% mutate(haplotype = paste(genotype, genotype2, sep = ' '))
+
+
 ```
 
 ```{r}
 
-r2_summ = snps_3L_g %>%
+r2_summ = snps_3L %>%
   group_by(pos) %>%
   summarise(
-    p0 = length(genotype[genotype == '0'])/length(line),
-    p2 = length(genotype2[genotype2 == '2'])/length(line),
-    p02 = length(haplotype[haplotype == '0 2'])/length(line),
+    p0 = length(genotype[genotype == '0'])/length(genotype),
+    p2 = length(genotype2[genotype2 == '2'])/length(genotype),
+    p02 = length(haplotype[haplotype == '0 2'])/length(genotype),
     r2 = ((p02 - (p0 * p2))^2) / (p0*(1-p0)*p2*(1-p2))
   )
 
