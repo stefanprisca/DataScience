@@ -31,7 +31,7 @@ But for speed we recommend that you unzip the data - then work on the unzipped d
 
 #### Q: Unzip the data, extract all variants located on the chromosome and save the data (write_rds)
 
-
+Comment out during kniting to make it faster.
 ```
 
 library(tidyverse)
@@ -210,32 +210,19 @@ Poisson distribution
 #### Q: Make goodness of fit test of the coverage data of your variants on chromosome 3L: is the theoretical distribution you just proposed a good fit for the data?
 
 ```{r}
-cov_freq = data_3L %>% group_by(cov) %>% summarise(n = n())
-c1 = data.frame(1, sum(cov_freq[1:11,]$n))
-names(c1) = names(cov_freq)
-c2 = data.frame(49, sum(cov_freq[45:63,]$n))
-names(c2) = names(cov_freq)
-c3 = merge(c1, cov_freq[12:44,], all = TRUE)
-cov_freq = merge(c3, c2, all = TRUE)
+cov_freq = data_3L %>% group_by(cov) %>% summarise(obs = n())
 
-total_cov = sum(cov_freq$n)
-mean_cov = sum(cov_freq$cov * cov_freq$n) / total_cov
-poisson_probs = (exp(1)^-mean_cov * mean_cov^cov_freq$cov)/factorial(cov_freq$cov) 
-expected_cp = total_cov * poisson_probs
+total_cov = sum(cov_freq$obs)
+mean_cov = sum(cov_freq$cov * cov_freq$obs) / total_cov
 
-#We need to group them a bit. the expected are too small
-expected_cp = #c(sum(expected_cp[1:2]), expected_cp[11:49], sum(expected_cp[50:63]))
-observed_cp = cov_freq$n #c(sum(cov_freq$n[1:10]), cov_freq$n[11:49], sum(cov_freq$n[50:63]))
+observed_cp = cov_freq$obs
+expected_cp = dpois(cov_freq$cov, mean_cov)
 
+tbl = tibble(observed_cp, expected_cp)
 
-xsqr_stat = sum(((observed_cp - expected_cp)^2) / expected_cp)
-df = length(observed_cp) - 2
-mean(1 - pchisq(xsqr_stat, df = df))
-
-ggplot() + geom_line(mapping = aes(x = 1:35, y = expected_cp)) +
-   geom_point(mapping = aes(x = 1:35, y = observed_cp), color = 'green')
+chisq.test(tbl, correct = FALSE)
 ```
-Yes. Aparently the poison distribution is a perfect match for our data, as long as we group the positions such that none of the resulting categories has low frequencies (meeting the requirements for the chi2 test).
+Yes. Aparently the poison distribution is a pretty good match for our data, given the result of the chisq test.
 
 # From now on you should focus on a smaller region of chromosome 3L
 
@@ -243,38 +230,39 @@ Yes. Aparently the poison distribution is a perfect match for our data, as long 
 
 So only pick 20000 SNPS. Ignore INSertions, DELetions, and MNPs.
 
+
+The following part has been commented out during kniting, to make it faster.
+
 ```
-end_pos = median(data_3L$pos)
 
 f <- function(df, pos) {
-  #print(df)
-  
-  tt <- df[1:1000,] %>% 
-    filter(chr == '3L' & pos < end_pos) %>%
-    gather(key = "line", value = "genotype", starts_with("line")) %>%
-    filter(genotype != '-') %>%
-  {.}
+  tt <- df %>% filter(chr == '3L') %>% {.}
   
   tt['var_class'] = str_split_fixed(tt['id'][[1]], "_", 3)[,3]
-  #write_csv(tt, "../datasets/dgrp2.3L", append = TRUE) # Log progress to log file
   tt_res = tt %>% filter(var_class == 'SNP')
   return(tt_res)
 }
 
 data_file_path = "../datasets/dgrp2.tgeno"
 
-first_2 = read_delim(data_file_path, delim = ' ', n_max = 2)
-
-df_ <- read_delim_chunked(file = data_file_path, 
+df_2 <- read_delim_chunked(file = data_file_path, 
                          callback = ListCallback$new(f), 
                          chunk_size = 50000, guess_max = 100,
                          col_names = T, delim = " ", comment = "#",
                          progress = T)
-
-df_ <- bind_rows(df_)
-snps_3L <- df_
-
 ```
+
+#### Q: Pick a starting point on chromosome 3L and extract/slice 20000 SNPs downstream of that position. What is the range of the positions?
+```{r}
+df <- bind_rows(df_2)
+start <- length(df$pos) - 25000
+
+snps_3L <- slice(df, start:(start+20000) )  %>%
+  gather(key = "line", value = "genotype", starts_with("line")) %>%
+  filter(genotype != '-')
+summary(snps_3L$pos)
+```
+
 
 #### Q: Calculate the r squared association between each pair of neighboring SNPS (this association is also called "linkage disequilibrium")
 
@@ -314,28 +302,24 @@ HINT: only use cases where both SNPs are genotyped in the line (i.e. 0 or 2)
 # ... with 3,953,808 more rows
 
 ```
-
- 
-
 ```{r}
 
-snps_3L['genotype2'] = lead(snps_3L$genotype, 1)
-snps_3L = snps_3L %>% mutate(haplotype = paste(genotype, genotype2, sep = ' '))
-
-
-```
-
-```{r}
-
-r2_summ = snps_3L %>%
+r2_summ = snps_3L %>% 
+  arrange(line, pos) %>%
+  mutate(
+    bp = lead(pos) - pos,
+    genotype2 = lead(genotype, 1), 
+    haplotype = paste(genotype, genotype2)) %>% 
+  drop_na()  %>%
   group_by(pos) %>%
   summarise(
-    p0 = length(genotype[genotype == '2'])/length(genotype),
+    bp = mean(bp),
+    p0 = length(genotype[genotype == '0'])/length(genotype),
     p2 = length(genotype2[genotype2 == '2'])/length(genotype2),
-    p02 = length(haplotype[haplotype == '2 2'])/length(haplotype),
+    p02 = length(haplotype[haplotype == '0 2'])/length(haplotype),
     r2 = ((p02 - (p0 * p2))^2) / (p0*(1-p0)*p2*(1-p2))
-  )
-
+  ) %>%
+  filter(!is.na(r2))
 ```
 
 #### Q: Summarize average LD in distance bins and visualize how LD varies with the physical distance beween SNPs (measured in bp)
@@ -350,20 +334,20 @@ ifelse(dist > 10, 5 + 10 * dist %/% 10, dist )
 ```
 
 ```{r}
-bp = lead(r2_summ$pos, 1) - r2_summ$pos
 
-r2_summ['bp'] = bp
+smoothing = 1000
+mid = smoothing / 2
 
 r2_vs_dist = r2_summ %>%
-  mutate(bpg = 50 + 100 * bp %/% 100) %>%
+  mutate(bpg = mid + smoothing * bp %/% smoothing) %>%
   group_by(bpg) %>%
-  summarise(r2g = mean(r2, na.rm = TRUE))
+  summarise(r2g = mean(r2))
 
-ggplot(r2_vs_dist, aes(x = log10(bpg), y = r2g)) + geom_line()
+ggplot(r2_vs_dist, aes(x = log2(bpg), y = r2g)) + geom_point()
 
-  
 ```
 
 #### Q: Compare and discuss with the Fig 1 of the paper.
-  
-Running the computations on all the 3L SNP variants that appea on lower positions in the chromozome, we see similar results as the ones obtained in the paper. The LD has a logarithmic decrease with respect to the physical distances between variants.
+The results depend a lot on the positions that you get. Usually r2 decreases with the distance between positions, but not for each specific case. If we bin the distances in large enough bins, then we see a general decrease. 
+
+If however, we would run this on all of our data (like in the paper), we would obtain similar results to what the authors have.
