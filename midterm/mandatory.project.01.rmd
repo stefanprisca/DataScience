@@ -216,13 +216,24 @@ total_cov = sum(cov_freq$obs)
 mean_cov = sum(cov_freq$cov * cov_freq$obs) / total_cov
 
 observed_cp = cov_freq$obs
-expected_cp = dpois(cov_freq$cov, mean_cov)
 
-tbl = tibble(observed_cp, expected_cp)
+poisson_probs = (exp(-mean_cov) * mean_cov^cov_freq$cov)/factorial(cov_freq$cov) 
+expected_cp = total_cov * poisson_probs
 
-chisq.test(tbl, correct = FALSE)
+tbl = data.frame(observed_cp, expected_cp) %>% drop_na()
+
+test_result = chisq.test(tbl, simulate.p.value = TRUE)
+test_result
+
+1-test_result$p.value
+
+
+x_axis = log10(cov_freq$cov)
+ggplot() + geom_line(mapping = aes(x_axis, observed_cp), color = 'green') +
+  geom_point(mapping = aes(x_axis, observed_cp), color = 'blue')
 ```
 Yes. Aparently the poison distribution is a pretty good match for our data, given the result of the chisq test.
+Note that, since the expected values are small, I choose to use simulation for the p value. It can also be done by grouping, but it seems to give more precise results in this way.
 
 # From now on you should focus on a smaller region of chromosome 3L
 
@@ -255,7 +266,7 @@ df_2 <- read_delim_chunked(file = data_file_path,
 #### Q: Pick a starting point on chromosome 3L and extract/slice 20000 SNPs downstream of that position. What is the range of the positions?
 ```{r}
 df <- bind_rows(df_2)
-start <- length(df$pos) - 25000
+start <- length(df$pos)/2 #- 25000
 
 snps_3L <- slice(df, start:(start+20000) )  %>%
   gather(key = "line", value = "genotype", starts_with("line")) %>%
@@ -302,26 +313,23 @@ HINT: only use cases where both SNPs are genotyped in the line (i.e. 0 or 2)
 # ... with 3,953,808 more rows
 
 ```
-```{r}
 
-r2_summ = snps_3L %>% 
-  arrange(line, pos) %>%
-  mutate(
-    bp = lead(pos) - pos,
-    genotype2 = lead(genotype, 1), 
-    haplotype = paste(genotype, genotype2)) %>% 
-  drop_na()  %>%
+```{r}
+snps_3L['genotype2'] = lead(snps_3L$genotype, 1)
+snps_3L = snps_3L %>% mutate(haplotype = paste(genotype, genotype2, sep = ' '))
+
+size = length(snps_3L$genotype)
+r2_summ = snps_3L %>%
   group_by(pos) %>%
   summarise(
-    bp = mean(bp),
-    p0 = length(genotype[genotype == '0'])/length(genotype),
-    p2 = length(genotype2[genotype2 == '2'])/length(genotype2),
-    p02 = length(haplotype[haplotype == '0 2'])/length(haplotype),
+    p0 = sum(genotype == '2')/size,
+    p2 = sum(genotype2 == '2')/size,
+    p02 = sum(haplotype == '2 2')/size,
     r2 = ((p02 - (p0 * p2))^2) / (p0*(1-p0)*p2*(1-p2))
-  ) %>%
-  filter(!is.na(r2))
-```
+  )
 
+
+```
 #### Q: Summarize average LD in distance bins and visualize how LD varies with the physical distance beween SNPs (measured in bp)
 
 HINT: 
@@ -332,22 +340,24 @@ dist <- 1:200
 ifelse(dist > 10, 5 + 10 * dist %/% 10, dist )
 
 ```
-
 ```{r}
+bp = lead(r2_summ$pos, 1) - r2_summ$pos
 
-smoothing = 1000
+r2_summ['bp'] = bp
+
+smoothing = 1
 mid = smoothing / 2
 
 r2_vs_dist = r2_summ %>%
   mutate(bpg = mid + smoothing * bp %/% smoothing) %>%
   group_by(bpg) %>%
-  summarise(r2g = mean(r2))
+  summarise(r2g = mean(r2, na.rm = TRUE))
 
-ggplot(r2_vs_dist, aes(x = log2(bpg), y = r2g)) + geom_point()
-
+ggplot(r2_vs_dist, aes(x = log10(bpg), y = r2g)) + geom_point()
 ```
 
 #### Q: Compare and discuss with the Fig 1 of the paper.
 The results depend a lot on the positions that you get. Usually r2 decreases with the distance between positions, but not for each specific case. If we bin the distances in large enough bins, then we see a general decrease. 
+In the plot above, even though there are a lot of outliers, the decrease is noticeable.
 
 If however, we would run this on all of our data (like in the paper), we would obtain similar results to what the authors have.
