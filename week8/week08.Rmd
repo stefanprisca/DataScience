@@ -1,0 +1,221 @@
+---
+title: "Data Science for Bioinformatics  -- week 08: a Walk through ANOVA examples"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+### A few words before we get started
+
+Below  you will get a walk through - in R- of the first example presented in chapter 5 of the book. 
+In practice, the "fixed effect ANOVA" is the prime example that you want to focus on for this week. The random effect model is also implemented (see below) but is peripheral for this particular course, although it can have a lot of applications (see for instance quantitative genetics in human or a wide range of other studies).
+
+# Preamble 
+```{r}
+library(tidyverse)
+```
+
+# 1-Way Anova with fixed effect (Book example 15.1) ####
+Here we go 
+```{r}
+circadian <- read.csv(url("http://www.zoology.ubc.ca/~schluter/WhitlockSchluter/wp-content/data/chapter15/chap15e1KneesWhoSayNight.csv"))
+dim(circadian)
+table(circadian$treatment)
+head(circadian) # a glimpse of the data
+circadian$treatment <- factor(circadian$treatment, 
+                              levels = c("control", "knee", "eyes")) ##to order treatments
+
+
+circadian %>% ggplot() + geom_jitter(aes(x=treatment, y=shift), position=position_jitter(0.2)) + theme_minimal()
+
+```
+
+>Q Can you do a better graph :) ? (for instance visualise the mean and the spread of data in each group and the "grand" mean of all observations )
+
+```{r}
+cir_summ = circadian %>% 
+  group_by(treatment) %>%
+  summarise(mean_g = mean(shift), min_g = min(shift), max_g = max(shift))
+  
+ggplot(cir_summ) + geom_point(mapping = aes(x = treatment, y = mean_g)) +
+  geom_linerange(mapping = aes(x = treatment, ymin= min_g, ymax = max_g)) +
+  geom_point(data = circadian, mapping = aes(x = treatment, y = mean(shift)), color = 'green')
+```
+
+
+```{r}
+boxplot(data=circadian, shift~treatment)# boxplot per treatment
+abline(h=mean(circadian$shift), col="red", lwd=2) # adding the grand mean
+
+circadian %>% ggplot() + geom_boxplot(aes(x=treatment, y=shift)) + theme_minimal() + 
+  geom_hline(yintercept = mean(circadian$shift))
+
+```
+
+
+# 1 way fixed effect anova 
+
+Anova are just one instance of linear models (when the effects are fixed). 
+
+```{r}
+circadianAnova <- lm(shift ~ treatment, data = circadian) #Fitting the anova model with treatment as fixed effect
+circadianAnova # Not very informative 
+```
+
+But the anova() function returns an ANOVA table  virtually identical to what is presented in the book (p463).  If you explore exploring the fitted object circadianAnova with names it allows you to extract further summaries 
+
+```{r}
+anova(circadianAnova) ## The most important way of summarizing an ANOVA should match the book table
+summary(circadianAnova) ## to get the R^2 and other summaries
+names(circadianAnova) # useful to extract particular stats like the R^2 etc
+```
+
+#Checking the assmumption behind the ANOVA model 
+```{r}
+plot(circadianAnova)                     ## diagnostic plots of the ANOVA 
+hist(circadianAnova$residuals)           ## visual check on residuals 
+shapiro.test(circadianAnova$residuals)   ## normality test of residuals here we do not reject normality --> Good
+
+```
+
+# Simulating the null distribution for the F-test.
+Once we calculate the test statistic of the ANOVA, we need to decide if the observed value of the F-test (also called interchangeably F-ratio in the ABD book) is about 1 (we expect that under H0) or if F is substantially bigger than 1 then we reject  $H_0$. 
+More precisely we need the sampling distribution of the F-test under the null to decide. 
+
+Just like we used simulations to obtain the null distribution for a variance to mean ratio to decide if data follows a Poisson distribution, or for a t-test,  we can also simulate many datasets to find out the sampling distribution of the F-test statistic under the null hypothesis that there is no differences between groups.
+
+So let's generate data under the null hypothesis (all three groups have same mean and same variance). 
+To do so we need a (probability) model for the data. Here the null hypothesis really tha data is obtained by sampling from an identical underlying normal distribution with mean $\mu$ and standard deviation $\sigma$. 
+
+Bu to generate actual data we have to specify what normal distribution is to be sampled. Here we use the mean and variance in the sample to specify the data under the null.
+
+```{r}
+h0mean <- mean(circadian$shift)                                  # choosing the mean for the normal distribution under H0
+h0SD   <- sqrt(var(circadian$shift))                             # choosing the SD for the normal distribution under H0
+One_dataset_h0 <- data.frame( treatment=circadian$treatment,     #reusing the group labels of the original data
+                           shift=rnorm(n = 22, mean = h0mean, sd = h0SD)) #simulating 22 obs from the normal
+stripchart(shift ~ treatment, data = One_dataset_h0, method = "jitter", 
+           vertical = TRUE, pch=20)    
+abline(h=mean(One_dataset_h0$shift), col="red", lwd=2, lty=3) # just adding the grand mean of the simulated data
+
+One_dataset_h0 %>% ggplot() + geom_jitter(aes(x=treatment, y=shift), position=position_jitter(0.2)) + geom_hline(yintercept = mean(One_dataset_h0$shift), col="red", linetype = "dashed") + theme_minimal()
+
+anovaOnHodata <-  lm(shift ~ treatment, data = One_dataset_h0) 
+anova(anovaOnHodata)
+```
+
+
+Try and evaluate the small chunk of R code above multiple time and convince yourslef that "just by chance " you can generate data where there are some non trivial differences between the three groups. Accordingly the observed values of the $F-test$ statistic and the p-value are changing .. 
+
+Now let us be more systematic and generate "many" datasets and investigate :
+
+* the sampling distribution of the F-test statistic.
+* the distribution of the P value for the test
+
+```{r}
+
+myPvals  <- NULL
+myFtests <- NULL
+nSims    <- 10^4  # try 100 first and then increase 10 or 100 fold depending on how fast your computer is ;-)
+
+for (i in 1:nSims) {
+  # Simulate Data under H0
+  One_dataset_h0 <- data.frame( treatment=circadian$treatment, 
+                           shift=rnorm(n = 22, mean = h0mean, sd = h0SD))
+  # ANOVA under the simulated data
+  anovaOnH0data <- lm(shift ~ treatment, data = One_dataset_h0)
+  anovaTable    <- anova(anovaOnH0data)
+  # Extracting and saving the F test and p-value for each dataset
+  myFtests[i] <- anovaTable[[4]][1] # looks barbaric but just extracting the F test value
+  myPvals[i]  <- anovaTable[[5]][1] # looks barbaric but just extracting the p value
+}
+```
+
+>Q: vizualize the distribution of the F-test statistic  :
+
+
+```{r}
+ggplot() +
+  geom_histogram(aes(x=myFtests, y=..density..), bins=50,fill="green") +
+  NULL
+
+```
+
+
+>Q Is it the distribution we expect ? 
+
+According to the book (ABD, p 467--468), we expect that (under H0) the test statsistic $F$ will be well aproximated by a so-called F probability distribution $F_{2,19}$. Just like the case of goodness of fit tests ($\chi^2$ probability distribution vs the $\chi^2_{obs}$ test statistic on a given dataset), be aware that there is difference between the statistic you calculate on a dataset and the probability distribution that is being used to describe the sampling distribution of that statistic.
+
+Do a visual check of that difference by simulating $10^4$ draws from the $F_{2,19}$ probability distribution and comparing it to the distribution of F calculated on datasets simulated under H0.
+
+
+>Q: What is the distribution of p-values under H0?
+
+If $F_{2,19}$ is  a pretty good approximation for the distribution of the $F$ test stats we calculate when we do ANOVAs, under H0 we should get the now famous uniform distribution for p-values.
+
+Check that by comparing the distribution of p values you obtain with $10^4$ draws from a uniform distribution in [0,1].
+
+
+```{r}
+myUnifRandomdeviates= runif(n = 10^4,min = 0,max=1)
+ggplot() +
+  geom_histogram(aes(x=myPvals, y=..density..), bins=50,fill="blue2") +
+  geom_density(aes(x=myUnifRandomdeviates)) +
+  NULL
+
+```
+
+
+# Using simulations to explore what is the power of an ANOVA design
+
+>Q: Write your own power simulation in R :0) 
+
+Adapt the R code that was used above to simulate under H0 to find out what is the power of an experimental like the one reported in example 15.1 to reject H0 at the $\alpha = 0.01$ level ? 
+
+To do so, simulate several datasets under an alternative hypothesis that you specify.
+
+To specify the alternative (HA), you need to decide how big is the differenc eamong groups and how much variation there is within reach group. 
+Use the actual observed differences among groups and the variation reported in the data (you can calculate these for each group using your facourite tidyverse R functions or look it up in Table 15.1-1). 
+We also assume that under HA, the data is normally distributed (but instead of assuming that data is all coming from a single distribution, we use one normal distribution for each group to simulate data). 
+Simulate $n_{Sims}=500$ datasets with identical sample size under HA, and obtain the sampling distribution of F under HA and visualize how different it is from F under H0.
+
+A reminder: the fraction of datasets that have an observed F test statistic that is exceeding your treshold for significance is your expected power.
+
+
+
+##1 way ANOVA random (example 15.6) ####
+This is just a very quick walkthrough in R but without much details or comments. You can follow the book section and examinr the code 
+
+# Importing the data
+
+The data can be downloaded from the authors website or fectched in the data directory 
+```{r}
+walkingstick <- read.csv(url("http://www.zoology.ubc.ca/~schluter/WhitlockSchluter/wp-content/data/chapter15/chap15e6WalkingStickFemurs.csv"))
+head(walkingstick)
+dim(walkingstick)
+```
+
+
+#Fitting the 1 way anova model 
+```{r}
+
+library(nlme)
+walkingstickAnova <- lme(fixed = femurLength ~ 1, 
+                         random = ~ 1|specimen, data = walkingstick)
+```
+
+Getting the model output and relating it to the amount of variation 
+
+```{r}
+walkingstickVarcomp <- VarCorr(walkingstickAnova) #n# Getting the variance components
+
+walkingstickVarcomp ## the matrix of variance covariance fitted to the model 
+
+varAmong  <- as.numeric( walkingstickVarcomp[1,1] ) ## Extracting the variance among groups
+varWithin <- as.numeric( walkingstickVarcomp[2,1] ) ## Extracting the variance within groups
+repeatability <- varAmong / (varAmong + varWithin)  ## Matching the book 
+repeatability
+
+```
+

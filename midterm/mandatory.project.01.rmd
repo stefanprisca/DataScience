@@ -229,7 +229,7 @@ test_result
 
 
 x_axis = log10(cov_freq$cov)
-ggplot() + geom_line(mapping = aes(x_axis, observed_cp), color = 'green') +
+ggplot() + geom_line(mapping = aes(x_axis, expected_cp)) +
   geom_point(mapping = aes(x_axis, observed_cp), color = 'blue')
 ```
 Yes. Aparently the poison distribution is a pretty good match for our data, given the result of the chisq test.

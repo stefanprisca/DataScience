@@ -1,0 +1,274 @@
+---
+title: "Data Science for Bioinformatics - week 09"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+
+# Correlation and regression exercise using the Mammals dataset 
+
+The aim of the exercise is to go through
+
+ * strength and direction of correlation
+ * significance of correlation
+ * fitting a linear model to data
+ * coefficients of model (effect size)
+ * significance of model
+ * difference between correlation and regression
+
+
+# Example
+
+```{r warning=FALSE, message=FALSE}
+
+library(tidyverse)
+set.seed(0)
+
+df    <- data.frame(x=1:100)
+df$y  <- 5 + 0.05*(df$x) + rnorm(100)
+
+plot1 <- ggplot(data = df, mapping = aes(x = x, y = y)) + 
+  geom_point() + 
+  NULL
+
+plot(plot1)
+
+```
+
+# Load the data
+
+```{r}
+
+library(tidyverse)
+mammals <- read_csv(file = "../datasets/dataset.01.rsbl20150010supp1.csv")
+
+```
+
+# Overall research questions
+
+ * Is the expression level correlated with the dN/dS ratio in Chimpanzee?
+ * Is the correlation significant?
+ * How well does a linear model (linear regression) fit the data? 
+ * What about residuals?
+ * How strong is the effect?
+ * Is the effect significant?
+
+Since we expect the data to be very noise (week 3) we summarise it pr. chromosome.
+
+#### Q: Get median expression, median dnds and number of genes pr. chromosome pr. species
+
+```{r}
+mamm_summ = mammals %>%
+  group_by(chr, Species) %>%
+  summarise(med_RPKM = median(RPKM), med_dnds = median(dNdS), nof_genes = n())
+
+ggplot(mamm_summ) + geom_point(mapping = aes(x = med_RPKM, y = med_dnds)) + facet_grid(Species~.)
+```
+
+# For the rest of the exercise we will focus on chimpanze
+```{r}
+chimp_data = mamm_summ %>% filter(Species == 'Chimp') %>% {.}
+```
+
+
+#### Q: What is the correlation between dNdS and expression level for Chimpanze?
+
+
+```{r}
+
+cor(df$x, df$y)
+
+cor.test(df$x, df$y)
+
+```
+
+Present these results both visually as well as a number.
+
+```{r}
+ggplot(chimp_data) + geom_point(mapping = aes(x = med_RPKM, y = med_dnds))
+cor.test(chimp_data$med_RPKM, chimp_data$med_dnds)
+```
+
+#### Q: discuss and interpret the results. 
+
+
+# Testing the correlation 
+
+HINT: cor.test()
+
+#### Q; What is the 95% confidence interval of the correlation?
+
+#### Q: Is the observed correlation significant?
+
+The confidence interval is [-0.84, -0.35]. THe correlation of -0.66 is pretty significant I would say. the dnds decreases with a factor of 0.66 as RPKM increases. Also, the confidence interval is good. It means there is a pretty strong correlation among our population.
+
+#### Q: So what can you say about the correlation in chimpanze?
+
+Given the confidence interval, there is a strong correlation between dnds and RPKM in chimps.
+
+
+# Regression analysis
+
+```{r}
+
+fit <- lm(y ~ x, data = df) 
+print(fit)
+
+names(fit)
+
+summary(fit)
+
+```
+
+
+# Q: What is the difference between lm and cor? 
+The difference bewteen linear regression and correlation: regression fits a line to the data, showing the trend, while correlation measures how one variable depends on the other. 
+
+
+#### Q: Make a linear regression of expression and dnds where dnds is the response variable (like figure 1 in the paper).
+
+```{r}
+fit_chimp = lm(data = chimp_data, med_dnds ~ med_RPKM)
+```
+
+#### Q: inspect your regression object using names() and summary()
+
+```{r}
+summary(fit_chimp)
+```
+
+
+#### Q: What coefficients are estimated for the regression? 
+
+```{r}
+fit_chimp$coefficients
+```
+
+
+#### Q: What is the R^2 of the model? 
+
+Residual standard error: 0.05761 on 22 degrees of freedom
+
+#### Q: Make a scatterplot of median expression (x) vs. dnds (y) and add a regression line.
+
+HINT: Google how to add a regression line to a ggplot!
+
+Also: highlight number of genes on chromosome (e.g. symbol size)
+
+```{r}
+a = fit_chimp$coefficients['(Intercept)']
+b = fit_chimp$coefficients['med_RPKM']
+fit_line = a + b*chimp_data$med_RPKM
+fit_plot = ggplot(chimp_data) + geom_point(mapping = aes(med_RPKM, med_dnds, size = nof_genes), shape = 'O') +
+  geom_line(mapping = aes(med_RPKM, fit_line), color = 'green', size = 2, linetype = 2)
+fit_plot
+```
+
+# Residuals
+
+#### Q: Make a residual plot (observed x vs. residuals) where you also show number of genes pr. datapoint - does it look ok?
+
+HINT: names(lm) and ?lm
+
+```{r}
+chimp_residuals = chimp_data
+chimp_residuals['residual'] = fit_chimp$residuals
+
+ggplot(chimp_residuals) + geom_point(mapping = aes(med_dnds, residual, size = nof_genes), shape = 'O') +
+  geom_hline(mapping = aes(yintercept = 0), color = 'green', size = 2, linetype = 2) +
+  geom_smooth(method='lm', mapping = aes(med_dnds, residual), color ='red', se = FALSE)
+```
+
+Well, it does look good considering the regression line. The residual values are as they were expected. But it seems like data is moving away from the regression line. The the trend is for residuals to grow as dnds grows. This can be seen by the second regression line drawn on residuals. This is due to the outlier, which could be removed by reshaping the data.
+
+Also, it seems like chr with more genes have better estimates.
+
+
+# Weighted regression
+
+#### Q: Do you see some data points with small sample size may be influencing the regression too much?
+
+Basically: do you see problems?
+
+Discuss: If chromosome with more genes have more precise dnds estimates - how can we improve the regression?
+1) we can use only a subset of the data
+2) we could use a different weight in the fitting process.
+
+Hint: ?lm
+
+#### Q: Perform and visualize a weighted regression and compare it with the normal unweighted regression
+
+HINT1: lm(x ~ y, weights = n, data = ...)
+
+HINT2: geom_smooth(data = ..., mapping = aes(..., weight = n), color="blue", se=F, method="lm")
+
+Discuss the results - what does it mean and what have you done?
+
+```{r}
+fit_chimp_w = lm(data = chimp_data, med_dnds ~ med_RPKM, weights = nof_genes)
+aw = fit_chimp_w$coefficients['(Intercept)']
+bw = fit_chimp_w$coefficients['med_RPKM']
+fit_line_w = aw + bw*chimp_data$med_RPKM
+
+fit_plot + geom_line(mapping = aes(med_RPKM, fit_line_w), color = 'red', size = 1.5, linetype = 2)
+
+```
+We say that the more genes we have, the less variance there is. So the algorithm fits a line that matches these points more.
+
+
+# Testing the regression
+
+Read "The ANOVA approach" page 554 in the book and anova test the unweighted regression
+
+#### Q: Compare the anova result with the cor.test result.
+
+```{r}
+```
+
+
+# Residuals when we KNOW the model is wrong
+
+Here I simulate a non-linear relationship and increasing variance
+
+```{r warning=FALSE, message=FALSE}
+
+library(tidyverse)
+
+set.seed(0)
+df    <- data.frame(x=1:100)
+df$y  <- 5 + 0.05*(df$x) + rnorm(100)
+df$y2 <- (df$x + 5*rnorm(100))^2
+
+plot1 <- ggplot(data = df, mapping = aes(x = x, y = y2)) + 
+  geom_point() + 
+  NULL
+
+plot(plot1)
+
+```
+
+#### Q: Make a linear regression on y2 ~ x and plot the residuals
+
+```{r}
+fit_bad = 
+```
+
+#### Q: Can you see that a linear fit is a bad predictor for y2?
+
+#### Q: Also make a lm fit where you fit sqrt(y2) ~ x and plot the raw data and the residuals
+
+```{r}
+```
+
+
+
+# Well done!
+
+```{r}
+
+browseURL(url = "https://www.youtube.com/embed/hf3CdRvv9cc?autoplay=1")
+
+```
+
