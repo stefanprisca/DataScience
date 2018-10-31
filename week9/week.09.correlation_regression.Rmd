@@ -62,7 +62,7 @@ Since we expect the data to be very noise (week 3) we summarise it pr. chromosom
 ```{r}
 mamm_summ = mammals %>%
   group_by(chr, Species) %>%
-  summarise(med_RPKM = median(RPKM), med_dnds = median(dNdS), nof_genes = n())
+  summarise(med_RPKM = median(log10(RPKM)), med_dnds = median(dNdS), nof_genes = n())
 
 ggplot(mamm_summ) + geom_point(mapping = aes(x = med_RPKM, y = med_dnds)) + facet_grid(Species~.)
 ```
@@ -149,7 +149,7 @@ fit_chimp$coefficients
 
 #### Q: What is the R^2 of the model? 
 
-Residual standard error: 0.05761 on 22 degrees of freedom
+Residual standard error: 0.06014 on 22 degrees of freedom
 
 #### Q: Make a scatterplot of median expression (x) vs. dnds (y) and add a regression line.
 
@@ -173,15 +173,11 @@ fit_plot
 HINT: names(lm) and ?lm
 
 ```{r}
-chimp_residuals = chimp_data
-chimp_residuals['residual'] = fit_chimp$residuals
-
-ggplot(chimp_residuals) + geom_point(mapping = aes(med_dnds, residual, size = nof_genes), shape = 'O') +
-  geom_hline(mapping = aes(yintercept = 0), color = 'green', size = 2, linetype = 2) +
-  geom_smooth(method='lm', mapping = aes(med_dnds, residual), color ='red', se = FALSE)
+ggplot(chimp_residuals) + geom_point(mapping = aes(fit_chimp$fitted.values, fit_chimp$residuals, size = nof_genes), shape = 'O') +
+  geom_hline(mapping = aes(yintercept = 0), color = 'green', size = 2, linetype = 2)
 ```
 
-Well, it does look good considering the regression line. The residual values are as they were expected. But it seems like data is moving away from the regression line. The the trend is for residuals to grow as dnds grows. This can be seen by the second regression line drawn on residuals. This is due to the outlier, which could be removed by reshaping the data.
+Well, it does look good considering the regression line. The residual values are as they were expected. But it seems like data is moving away from the regression line. The the trend is for residuals to grow as dnds grows. This can be seen by the second regression line drawn on residuals.
 
 Also, it seems like chr with more genes have better estimates.
 
@@ -207,16 +203,28 @@ HINT2: geom_smooth(data = ..., mapping = aes(..., weight = n), color="blue", se=
 Discuss the results - what does it mean and what have you done?
 
 ```{r}
-fit_chimp_w = lm(data = chimp_data, med_dnds ~ med_RPKM, weights = nof_genes)
+fit_chimp_w = lm(data = chimp_data, med_dnds ~ med_RPKM, weights = 1/exp(nof_genes))
 aw = fit_chimp_w$coefficients['(Intercept)']
 bw = fit_chimp_w$coefficients['med_RPKM']
 fit_line_w = aw + bw*chimp_data$med_RPKM
 
 fit_plot + geom_line(mapping = aes(med_RPKM, fit_line_w), color = 'red', size = 1.5, linetype = 2)
 
+summary(fit_chimp_w)
 ```
 We say that the more genes we have, the less variance there is. So the algorithm fits a line that matches these points more.
 
+Residuals plot:
+```{r}
+xmod = -1 * fit_chimp_w$fitted.values < 0
+x = xmod*log(abs(fit_chimp_w$fitted.values))
+
+ymod = -1 * fit_chimp_w$residuals < 0
+y = ymod * log(abs(fit_chimp_w$residuals))
+
+ggplot(chimp_data) + geom_point(mapping = aes(x, y, size = nof_genes), shape = 'O') +
+  geom_hline(mapping = aes(yintercept = 0), color = 'red', size = 1.5)
+```
 
 # Testing the regression
 
@@ -225,6 +233,8 @@ Read "The ANOVA approach" page 554 in the book and anova test the unweighted reg
 #### Q: Compare the anova result with the cor.test result.
 
 ```{r}
+anova(fit_chimp)
+cor.test(chimp_data$med_dnds, chimp_data$med_RPKM)
 ```
 
 
@@ -252,14 +262,33 @@ plot(plot1)
 #### Q: Make a linear regression on y2 ~ x and plot the residuals
 
 ```{r}
-fit_bad = 
+fit_bad = lm(y2~x, data = df)
+ab = fit_bad$coefficients['(Intercept)']
+bb = fit_bad$coefficients['x']
+fit_line_b = ab + bb*df$x
+
+plot1 + geom_line(mapping = aes(df$x, fit_line_b), size = 1.2, color = 'green')
+
 ```
 
 #### Q: Can you see that a linear fit is a bad predictor for y2?
+Yup, it does not fit properly.
 
 #### Q: Also make a lm fit where you fit sqrt(y2) ~ x and plot the raw data and the residuals
 
 ```{r}
+fit_sqrt = lm(sqrt(y2)~x, data = df)
+as = fit_sqrt$coefficients['(Intercept)']
+bs = fit_sqrt$coefficients['x']
+fit_line_sqrt = as + bs*df$x
+summary(fit_sqrt)
+
+ggplot(data = df, mapping = aes(x = x, y = sqrt(y2))) + 
+  geom_point() + geom_line(mapping = aes(df$x, fit_line_b), size = 1.2, color = 'green')
+
+
+ggplot() + geom_point(mapping=aes(x = fit_sqrt$fitted.values, y = fit_sqrt$residuals)) +
+  geom_hline(mapping = aes(yintercept = 0), size = 1.2, color = 'green')
 ```
 
 
