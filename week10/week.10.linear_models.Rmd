@@ -1,0 +1,160 @@
+---
+title: "Data Science for Bioinformatics - week 10"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+
+# Linear Models using the naked mole rat and the Mammals dataset 
+
+The aim of this session is to go through the different steps of linear models fitting and model checking 
+
+ * Fitting a series of linear models to data
+ * Comparing models using F tests
+ * understand differences in type I, II etc sum of squares
+ * vizualizing the fit of a model to the data
+ 
+
+# Load the data
+In the book example, the goal is to compare energy expenditure of two castes of naked mole-rat while adjusting for differences in body mass using analysis of covariance (aka ANOVA).
+
+```{r}
+moleRat <- read.csv(url("http://www.zoology.ubc.ca/~schluter/WhitlockSchluter/wp-content/data/chapter18/chap18e4MoleRatLayabouts.csv"))
+head(moleRat)
+moleRatSorted <- moleRat[ order(moleRat$lnMass), ]
+summary(moleRat)
+```
+## Model fitting
+
+We fit severalmodels to the data, beginning with the model lacking an interaction term. We use the R function lm because both caste and mass are fixed effects. We first use a model with no interactions:
+
+```{r}
+moleRatNoInteractModel <- lm(lnEnergy ~ lnMass + caste, data = moleRatSorted) # fit model
+moleRatSorted$predictedNoInteract <- predict(moleRatNoInteractModel) #save the predicted values in the data frame for vizualazing
+```
+
+Then, we fit a model with the interaction. Note that in the R function lm(), when we declare a general linear model of the form $Y = A*B$ it is a short hand for $Y = A + B + A*B$:
+
+```{r}
+moleRatFullModel <- lm(lnEnergy ~ lnMass * caste, data = moleRatSorted) 
+moleRatSorted$predictedInteract <- predict(moleRatFullModel)
+```
+
+>Question: Visualize the fit of both models (no interaction or with interactions) to the data (see for instance the book figure)
+
+```{r}
+library(tidyverse)
+
+ggplot(moleRatSorted) + geom_point(mapping = aes(lnMass, lnEnergy, shape = caste), size = 3) +
+  geom_line(mapping = aes(lnMass, predictedNoInteract, linetype = caste), color = 'red', size = 1.2) + 
+  geom_line(mapping = aes(lnMass, predictedInteract, linetype = caste), color = 'blue', size = 1.2)
+```
+
+
+
+# Testing for the effect using the appropriate F-ratio test 
+
+This is were it gets slightly messy :-)- Reason is the design is not exaxtly balanced to it actually matterns how you construct F test (because the expected values of the F tests do change)
+Here is a good read about the joys of the different types  (I, II etc) sum of squares:
+http://www.uni-kiel.de/psychologie/rexrepos/posts/anovaSStypes.html
+
+
+```{r}
+#install.packages("car")
+library(car) ## You need to install this library to get the type II or type III sum of squares
+moleRatNoInteractModelTypeIII <- lm(lnEnergy ~ lnMass + caste, data = moleRat)
+moleRatWIthInteractModelTypeIII <- lm(lnEnergy ~ lnMass * caste, data = moleRat)
+
+#Question: Why are we testing type 3 here? The model did not account for interaction. Shouldn't it be type 2?
+Anova(moleRatWIthInteractModelTypeIII, type = "III") # note "A" in Anova is capitalized
+
+Anova(moleRatNoInteractModelTypeIII, type = "III") # note "A" in Anova is capitalized
+
+```
+
+
+## Model checking
+You can use the  R diagnostic plots (just like in the case of ANOVA or regression) to visually check that the model assumptions are not strongly violated. 
+
+```{r}
+#install.packages("ggfortify")
+
+plot(moleRatNoInteractModelTypeIII) ## Old style 
+library(ggfortify) ## New style 
+ggplot2::autoplot(moleRatNoInteractModelTypeIII)
+ggplot2::autoplot(moleRatWIthInteractModelTypeIII)
+```
+
+# Reproducing the results obtained in the Mammals dn/ds and X versus autosome paper.
+The goal here is to re-analyse the data using the model proposed by the authors of the paper.
+The model fitted
+```{r}
+library(tidyverse)
+mammals <- read_csv(file = "../datasets/dataset.01.rsbl20150010supp1.csv")
+
+```
+
+>Q Spend a bit of time asking yourslef what terms of the models are (continuous) covariates or diecrete ANOVA-like factors 
+
+discrete: Species, chrMark
+continuous: log(RPKM), Tau, GC3
+
+>Q Refit the model used by the authors in their publication:
+
+$$ log(dNdS) = Species+ chrMark + log(RPKM)+ Tau+ GC3 $$
+
+
+To do that, adapt the naked mole rat R code and lm() and the Anova() function of the car package, to refit the model used by the authors and check your findings against the findings reported in Table 2 of the publication. Note that the authors use type II sum of squares to fit their model. 
+
+```{r}
+mam_mut = mammals %>% mutate(log_dNdS = log(dNdS), log_RPKM = log(RPKM))
+
+mammalsNoInteractModel <- lm(log_dNdS ~ Species + chrMark + log_RPKM + Tau + GC3, data = mam_mut)
+Anova(mammalsNoInteractModel, type = "II")
+
+mammalsInteractModel <- lm(log_dNdS ~ Species + chrMark + log_RPKM + Tau + GC3
+                           + Tau*log_RPKM + GC3 * log_RPKM + GC3*Tau 
+                           + Species*log_RPKM + Species*Tau + Species*GC3, data = mam_mut)
+Anova(mammalsInteractModel, type = "III")
+
+```
+
+
+
+# Exploring the effect of not accounting for confounding variables. 
+A main conlusion of the authors is that most of the variation in dn/ds and the apparent "faster X" effect is due to the fact that - for other reasons- there is a tendency for genes located on the X to be lowly expressed (as measured by log(RPKM)).
+
+>Q Fit a series of models that does not include the continuous covariates besides the species and chrMark factors.
+
+Try four models, labelled S0, S1 S2 S3 (S for spurious ;-) ) :
+
+$$ S_0: log(dNdS) =Species+ chrMark $$
+```{r}
+model1 <- lm(log_dNdS ~ Species + chrMark, data = mam_mut)
+Anova(model1, type = "II")
+```
+
+$$ S_1: log(dNdS) =Species+ chrMark + Tau  $$
+```{r}
+model2 <- lm(log_dNdS ~ Species + chrMark + Tau, data = mam_mut)
+Anova(model2, type = "II")
+```
+
+
+$$ S_2: log(dNdS) =Species+ chrMark+ GC_3 $$
+```{r}
+model3 <- lm(log_dNdS ~ Species + chrMark + GC3, data = mam_mut)
+Anova(model3, type = "II")
+```
+
+$$ S_3: log(dNdS) =Species+ chrMark + log(RPKM)$$
+```{r}
+model4 <- lm(log_dNdS ~ Species + chrMark + log_RPKM, data = mam_mut)
+Anova(model4, type = "II")
+```
+
+Examine the magnitude of this effect by finding out how big is the effect of the X versus Autosomes (the difference in means for that factors and what is the p-value attached to that effect) in models that do not include Tau log(RPKM) or GC3 as extra co-variates.
+
+

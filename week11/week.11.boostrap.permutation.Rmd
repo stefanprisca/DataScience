@@ -1,0 +1,332 @@
+---
+title: "Data Science for Bioinformatics - Week 11"
+author: "Palle"
+output: 
+  html_document: 
+    self_contained: yes
+editor_options: 
+  chunk_output_type: console
+---
+
+
+# For the entire exercise, work on chimpanzee from the mammals dataset.
+
+As earlier, we summarize median dnds and median expression pr. chromosome.
+
+```{r}
+
+library(tidyverse)
+mammals <- read_csv(file = "../datasets/dataset.01.rsbl20150010supp1.csv")
+
+chimp <- mammals %>% 
+  group_by(Species, chr) %>% 
+  summarise(n          = n(), 
+            dnds       = median(dNdS), 
+            expression = median(RPKM)) %>%
+  filter(Species=="Chimp")
+
+ggplot(chimp, mapping = aes(x=expression, y=dnds)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+
+cor(chimp$expression, chimp$dnds)
+
+cor.test(chimp$expression, chimp$dnds)
+
+```
+
+# Aim of exercise
+
+* Use bootstrapping to calculate 95% and 99% confidence interval - and compare with parametric values.
+* Use permutation to test if the observed correlation is significant - and compare with parametric test.
+* Use permutation to test if the observed regression slope is significant - and compare with parametric test.
+
+# Bootstrapping 
+
+Hint: https://en.wikipedia.org/wiki/Pearson_correlation_coefficient#Using_a_bootstrap
+
+#### Q: Make 8 bootstrapped datasets and plot them including a regression line
+
+HINT
+
+```{r}
+
+set.seed(0)
+
+a    <- data.frame(x= rnorm(10), z=0) %>% tbl_df()
+a$y  <- 0.5 * a$x + rnorm(nrow(a))
+
+pd   <- a
+
+i    <- 1
+j    <- sample(1:nrow(a), replace = TRUE)
+nd   <- a[j,]
+nd$z <- i
+pd   <- rbind(pd,nd) %>% tbl_df()
+
+i    <- 2
+j    <- sample(1:nrow(a), replace = TRUE)
+nd   <- a[j,]
+nd$z <- i
+pd   <- rbind(pd,nd) %>% tbl_df()
+
+ggplot(pd, mapping = aes(x=x, y=y)) + geom_point() + geom_smooth(method = "lm") + facet_wrap(~z, scales = "fixed")
+
+```
+
+```{r}
+samples = chimp %>% mutate(z = 0)
+for (i in 1:8){
+  rows = sample(1:nrow(chimp), replace = TRUE)
+  sample_ = chimp[rows,] %>% mutate(z = i)
+  samples = rbind(samples, sample_) %>% as_tibble()
+}
+
+
+ggplot(samples, mapping = aes(x=dnds, y=expression)) + geom_point() + geom_smooth(method = "lm") + facet_wrap(~z, scales = "fixed")
+```
+
+#### Q: Make 500.000 bootstrapped datasets and calculate the correlation coefficient for each of them
+
+HINT 
+
+```{r}
+
+r <- rep(NA,500000)  
+
+for (i in 1:length(r)) {
+  r[i] <- "some value" # <--- Save single values in vector of predefined size 
+                       #      This is a lot faster than putting values in a data frame!
+                       #
+                       # Also note how carefully formatted comments
+                       # will help you to understand my code
+  
+  if(i%%100000==0) {   # Progress tracker
+    cat(i, "\n")       
+    flush.console()
+  }
+}
+
+pd <- data.frame(i=1:length(r), value=r) %>% tbl_df() # Add column "i" to data frame
+pd
+
+```
+
+```{r}
+
+set.seed(0)
+
+cor_coeffs = rep(NA, 5*10^5)
+
+for (i in 1:length(cor_coeffs)){
+  rows = sample(1:nrow(chimp), replace = TRUE)
+  sample_ = chimp[rows,] %>% mutate(z = i)
+  
+  cor_coeffs[i] = cor(sample_$expression, sample_$dnds)
+  if(i%%100000==0) {   # Progress tracker
+    cat(i, "\n")       
+    flush.console()
+  }
+}
+summary(cor_coeffs)
+```
+
+#### Q: Visualize the distribution of the 500.000 bootstrapped correlation coefficients
+
+How does it look? 
+
+
+```{r}
+hist(cor_coeffs, plot = TRUE)
+```
+
+#### Q: Calculate the 95% bootstrapped confidence interval by getting the 2.5% and 97.5% percentile of the bootstrapped values
+
+```{r}
+cor_coeffs_s = sort(cor_coeffs)
+nOf_coeffs = length(cor_coeffs_s)
+
+i2.5 = nOf_coeffs * 0.025
+p2.5 = cor_coeffs_s[i2.5]
+
+i97.5 = nOf_coeffs * 0.975
+p97.5 = cor_coeffs_s[i97.5]
+
+conf_interval = c(p2.5, p97.5)
+```
+
+#### Q: Compare it with the output of cor.test
+
+```{r}
+cor.test(chimp$expression, chimp$dnds)
+conf_interval
+```
+
+#### Q: Calculate the 99% bootstrapped confidence interval and compare it with the output of cor.test for 99% CI
+
+```{r}
+cor_coeffs_s = sort(cor_coeffs)
+nOf_coeffs = length(cor_coeffs_s)
+
+i0.5 = nOf_coeffs * 0.005
+p0.5 = cor_coeffs_s[i2.5]
+
+i99.5 = nOf_coeffs * 0.995
+p99.5 = cor_coeffs_s[i97.5]
+
+c(p0.5, p99.5)
+cor.test(chimp$expression, chimp$dnds, conf.level = 0.99)
+
+```
+
+
+# Permutation test of the correlation between dnds and expression
+
+#### Q: Make 8 permuted datasets and plot them including a regression line
+
+HINT
+
+```{r}
+
+set.seed(0)
+
+a    <- data.frame(x= rnorm(10), z=0) %>% tbl_df()
+a$y  <- 0.5 * a$x + rnorm(nrow(a))
+
+pd   <- a
+
+i    <- 1
+j    <- sample(1:nrow(a), replace = TRUE)
+nd   <- a
+nd$x <- sample(nd$x)
+nd$z <- i
+pd   <- rbind(pd,nd) %>% tbl_df()
+
+i    <- 2
+j    <- sample(1:nrow(a), replace = TRUE)
+nd   <- a
+nd$x <- sample(nd$x)
+nd$z <- i
+pd   <- rbind(pd,nd) %>% tbl_df()
+
+ggplot(pd, mapping = aes(x=x, y=y)) + geom_point() + geom_smooth(method = "lm") + facet_wrap(~z, scales = "fixed")
+
+
+```
+
+
+```{r}
+samples = chimp %>% mutate(z = 0)
+for (i in 1:8){
+  sample_ = chimp %>% mutate(z = i)
+  sample_$dnds = sample(sample_$dnds)
+  samples = rbind(samples, sample_) %>% as_tibble()
+}
+
+
+ggplot(samples, mapping = aes(x=dnds, y=expression)) + geom_point() + geom_smooth(method = "lm") + facet_wrap(~z, scales = "fixed")
+```
+
+#### Q: Make 500000 permuted datasets and calculate the correlation of each of them
+
+```{r}
+
+set.seed(0)
+
+cor_coeffs_p = rep(NA, 5*10^5)
+
+for (i in 1:length(cor_coeffs)){
+  sample_ = chimp %>% mutate(z = i)
+  sample_$dnds = sample(sample_$dnds)
+  
+  cor_coeffs_p[i] = cor(sample_$expression, sample_$dnds)
+  if(i%%100000==0) {   # Progress tracker
+    cat(i, "\n")       
+    flush.console()
+  }
+}
+summary(cor_coeffs_p)
+
+```
+
+#### Q: Visualize the distribution of the permuted correlation coefficients and the observed correlation coefficient
+
+This is your permuted null distribution of the correlation coefficient
+
+HINT: geom_vline()
+
+```{r}
+observed_coff = cor(chimp$expression, chimp$dnds)
+ggplot() + geom_histogram(mapping = aes(cor_coeffs_p)) + geom_vline(xintercept = observed_coff, color = 'red')
+```
+
+#### Q: How many of the permuted datasets show an equal or more extreme correlation than the observed correlation? 
+
+```{r}
+nOf_more_extreme = sum(abs(cor_coeffs_p) >= abs(observed_coff))
+```
+
+#### Q: Divide that number with the total number of permutations (= the p value)?
+
+```{r}
+p = nOf_more_extreme / length(cor_coeffs_p)
+```
+
+#### Q: What would the p value be if the next permutation resulted in a more extreme value than the observed?
+
+```{r}
+
+(1 + nOf_more_extreme ) / ( length(cor_coeffs_p)+1 ) # Permuted p value assuming next permutation would be more extreme
+
+```
+
+#### Q: How does the number of permutations affect the p value estimate?
+They improve it. The more samples we have, the more accurate we would get to the actual result.
+
+#### Q: Compare your result with the output from cor.test ?
+
+```{r}
+p
+cor.test(chimp$expression, chimp$dnds)
+```
+
+# Regression
+
+#### Q: Discuss how you could use bootstrap and permutation to estimate uncertainty and significance of a linear regression
+
+ * Can you bootstrap the intercept?
+ * Can you bootstrap the slope?
+ * What is H0 when you test for regression?
+ * Can you use permutation to test that slope=0?
+
+# Permutation test of the slope of the regression line
+
+#### Q: Make 10000 permuted datasets and calculate the slope of the regression line for each of them
+
+```{r}
+
+set.seed(0)
+
+slopes_p = rep(NA, 10^4)
+
+for (i in 1:length(slopes_p)){
+  sample_ = chimp
+  sample_$dnds = sample(sample_$dnds)
+  
+  slopes_p[i] = lm(dnds ~ expression, sample_)$coefficients['expression']
+  if(i%%1000==0) {   # Progress tracker
+    cat(i, "\n")       
+    flush.console()
+  }
+}
+summary(slopes_p)
+```
+
+#### Q: Visualize the distribution of permuted slopes and the observed slope, is it significant?
+
+```{r}
+observed_slope = lm(dnds ~ expression, chimp)$coefficients['expression']
+ggplot() + geom_histogram(mapping = aes(slopes_p)) + geom_vline(xintercept = observed_slope, color = 'red')
+```
+Yes, the observed slope is significant. 
+
