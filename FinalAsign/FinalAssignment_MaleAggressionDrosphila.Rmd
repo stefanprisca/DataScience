@@ -1,0 +1,390 @@
+---
+title: "Final Assignemt - Data Science in Bioinformatics"
+author: "T Bataillon"
+date: "November 12, 2018"
+output: 
+  html_document:
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+
+
+# Instructions for returning your report
+
+Your report should be uploaded as a **zip** file containing: 
+
+* An Rmd file with the answers and comments
+
+* the HTML file you generated from the Rmd file.
+
+**IMPORTANT: Check your zip file and make sure that the html file contains all figures!!!**
+
+**DEADLINE: The upload shoud be done no later than 12.12.2018 at 12.00 (noon).**
+
+After the deadline, a peer-review will be started under black board. 
+
+**DEADLINE: The peer review should be done no later than 08.01.2019 at 12.00 (noon).**
+
+You will assigned 3 reports to peer review. You should use 15-20 minutes on each.
+
+**IMPORTANT: Both uploading your report and peer reviewing 3 other reports assigned to you is mandatory to be able to take the exam. **
+
+# Some background and the big picture for this assignment
+
+The goal of this assignment is to replicate some of the findings of a scientific paper:
+
+Shorter et al 2015 Genetic architecture of natural variation in Drosophila melanogaster aggressive behavior, 
+[PNAS](www.pnas.org/cgi/doi/10.1073/pnas.1510104112). Measurements of male aggression have been made for 200 lines out of the 205 lines of the DRGP pannel.
+
+The data is contained is the csv file "aggression.male.csv".
+
+If you want to "know"  more about male aggression in Drosphila and see some
+[real fights](https://www.youtube.com/watch?v=uJaDoTigvEI).   
+
+The idea for this final assignment is to combine the SNP data that you have been working on before with this aggression scores to examine if some SNPs in the genome associate with the variation in aggression scores observed among the Drosohila lines.
+
+When a population is variable for a collection of SNPs and also exhibits variation for a phenotypic trait ( here the aggression score), one can ask if there is a statistical association between a given SNP and the trait in the population. 
+
+This will be manifested by the fact that individuals that carry a specfic allele tend, on average, to have a higher (or lower) trait value (one also talks abou ta QTL for Quantitative trait locus,  i.e. a locus where polymorphism controls the variation of a quantitative traits (by opposition to a Mendelian trait).    
+
+Shorter et al 2015 report several significant associations between SNPs and the aggression scores. 
+
+Results of the SNP giving the top associations are given as supplementary table of the PNAS publication made available as (Dataset S2. Genome wide association analyses for aggressive behavior). See the  Excel file **pnas.1510104112.sd02.xlsx**
+
+The goals for this final project (see the precise questions below) is : 
+
+* Re-analyze jointly the variation found at specific SNPs of the left arm of chromosme 3 (aka 3L) 
+
+* Choose and motivate the choice of a method to test for the presence of an association in the data
+
+* Calculate the effect size associated with a SNP for the trait and provide a measure of the uncertainty of the that effect size (e.g. standard error)
+
+* Visualize the association at each specififc SNP tested
+
+# Getting the aggression score data
+
+The Aggression scores are made available for each Drosophila line (identified with lineId) in the csv file *aggression.male.csv*.
+
+```{r}
+
+library(tidyverse)
+
+#The aggression scores for each line
+Pheno        <- read_csv(file = "aggression.male.csv", col_names = FALSE)
+names(Pheno) <- c("lineid","aggression_score")
+
+head(Pheno)
+dim(Pheno)
+
+```
+
+
+>Q1. Vizualizing and summarizing male aggression scores among the lines. 
+
+Make a graph displaying the distribution of male aggression scores among the lines. 
+
+Summarize the distribution and comment on the general shape of the distribution (bimodal / skewed etc.)
+
+```{r}
+# Multiple plot function, as taken from < http://www.cookbook-r.com/Graphs/Multiple_graphs_on_one_page_(ggplot2)/ >
+#
+# ggplot objects can be passed in ..., or to plotlist (as a list of ggplot objects)
+# - cols:   Number of columns in layout
+# - layout: A matrix specifying the layout. If present, 'cols' is ignored.
+#
+# If the layout is something like matrix(c(1,2,3,3), nrow=2, byrow=TRUE),
+# then plot 1 will go in the upper left, 2 will go in the upper right, and
+# 3 will go all the way across the bottom.
+#
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  library(grid)
+
+  # Make a list from the ... arguments and plotlist
+  plots <- c(list(...), plotlist)
+
+  numPlots = length(plots)
+
+  # If layout is NULL, then use 'cols' to determine layout
+  if (is.null(layout)) {
+    # Make the panel
+    # ncol: Number of columns of plots
+    # nrow: Number of rows needed, calculated from # of cols
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                    ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+
+ if (numPlots==1) {
+    print(plots[[1]])
+
+  } else {
+    # Set up the page
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+
+    # Make each plot, in the correct location
+    for (i in 1:numPlots) {
+      # Get the i,j matrix positions of the regions that contain this subplot
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
+```
+
+
+```{r}
+
+tmp = str_split(Pheno$lineid, '_')
+pheno_ord = Pheno
+pheno_ord['lineid_n'] = as.integer(matrix(unlist(tmp), ncol=2, byrow=TRUE)[,2])
+
+# Order them by the line id so that we can use breaks in the distribution plot
+pheno_ord = pheno_ord[with(pheno_ord, order(lineid_n)),]
+tmp = str_split(pheno_ord$lineid, '_')
+pheno_ord$lineid = matrix(unlist(tmp), ncol=2, byrow=TRUE)[,2]
+
+# create bins for better visualization
+pheno_cuts = cut(pheno_ord$lineid_n, seq(0, 1000, 150))
+pheno_ord['bin_id'] = pheno_cuts
+
+point_plot = ggplot(pheno_ord) + geom_point(mapping= aes(lineid_n, aggression_score)) + ggtitle('Aggression Scores per Line')
+  
+box_plot = ggplot(pheno_ord) + geom_boxplot(mapping = aes(bin_id, aggression_score)) + ggtitle('Aggression Scores Boxplot')
+
+multiplot(point_plot, box_plot)
+
+```
+The agression over line number has a relatively continuous distribution. This can be seen both in the point plot, and in the box plot.
+
+
+>Q2. Preparing the data 
+
+Here you should prepare the data to replicate the results of associations detected on chromsome 3L and show the first lines of the result.
+
+Focus on the 4 SNPs reported in the publication that are located on chr 3L and that are showing the most significant association between aggression and SNP genoytpe (as measured by the lowest p-value).
+
+These SNPS are :
+
+ * 3L_14313095_SNP
+ * 3L_9132740_SNP
+ * 3L_10922119_SNP
+ * 3L_10922120_SNP
+
+Read in the DRGP genotypes data (dgrp2.tgeno.zip) and build a new dataframe that integrates for each lineID the following information: 
+
+* The name of the data frame should be "QTL_df" and the columns have the names indicated below in ()
+
+* The id of the line (lineid)
+
+* The aggression score of the line (Aggression_score)
+
+* A qualitatively defined aggression level defined by the following thresholdsholds (Aggression_level)
+
+    + "LOW" (Aggression < 20)
+    + "MEDIUM" (20 <= Aggression < 50)
+    + "HIGH" (Aggression >=50)
+          
+* The genotype at each SNP and each line, the genotype can be coded by the SNP allele carried or using the 0/2 genotype code (genotype) 
+
+End by showing the first lines of your data frame using head()
+
+```{r}
+#Reading the data...
+
+wanted_snps = c('3L_14313095_SNP', '3L_9132740_SNP', '3L_10922119_SNP', '3L_10922120_SNP')
+
+f <- function(df, pos) {
+  #print(df)
+  
+  tt <- df %>% 
+    filter(id %in% wanted_snps) %>%
+    {.}
+  #write_csv(tt, "../datasets/dgrp2.3L", append = TRUE) # Log progress to log file
+  
+  return(tt)
+}
+
+data_file_path = "../datasets/dgrp2.tgeno"
+
+first_2 = read_delim(data_file_path, delim = ' ', n_max = 2)
+
+df_ <- read_delim_chunked(file = data_file_path, 
+                         callback = ListCallback$new(f), 
+                         chunk_size = 50000, guess_max = 100,
+                         col_names = T, delim = " ", comment = "#",
+                         progress = T)
+data_3L = bind_rows(df_)
+write_csv(data_3L, "../datasets/dgrp2.3L_snps")
+```
+
+```{r}
+#Read directly from saved csv
+data_3L = read.csv("../datasets/dgrp2.3L_snps")
+```
+
+
+```{r}
+# Transform the data
+QTL_df = data_3L %>%
+  gather(key = "lineid", value = "genotype", starts_with("line"))
+
+QTL_df = merge(QTL_df, Pheno, by = c('lineid')) 
+names(QTL_df)[names(QTL_df)=="aggression_score"] <- "Aggression_score"
+
+
+cat_aggr = function(aggression) {
+  ifelse(aggression < 20, 'LOW', ifelse(aggression < 50, 'MEDIUM', 'HIGH'))
+}
+
+QTL_df = QTL_df %>% mutate(Aggression_level = cat_aggr(Aggression_score))
+
+head(QTL_df)
+```
+
+
+>Q3 Measuring and vizualizing the differences in male agression scores at each SNP
+
+For each SNP: 
+
+* measure the effect size and SEs associated with this effect for each SNP:
+
+The effect size is here measured as half the difference in mean between each group of genotypes.
+
+$$EffectSize=(Mean_2-Mean_0)/2$$ 
+
+The half is inherited from quantitative genetic: on average you transmit half of your genes to your offspring so you dilute the genetic effect by that much by mixing/mating at random...
+
+* make a graph comparing the distribution of aggression scores within each group defined by genotype. 
+
+A group is here defined by the SNP genotype of each line (i.e. you are 0 or 2, note that some lines could not be genotyped at certain SNPs).
+
+HINT: If we want to have an idea of the SE aroud that effect size, one can use for instance a boostrap approach to automatically get the sampling distribution around the effect size. Remember the definition of standard error.
+
+```{r}
+#* measure the effect size and SEs associated with this effect for each SNP:
+
+# Compute the effect size for each SNP
+base_df = QTL_df[c('genotype', 'id', 'Aggression_score')] %>%
+  filter(genotype == '0' | genotype == '2') %>%
+  group_by(id, genotype) 
+
+EffectSize_df = base_df %>%
+  summarise(mean_geno = mean(Aggression_score)) %>%
+  group_by(id) %>%
+  mutate(effect_size = (mean_geno[genotype == '2'] - mean_geno[genotype == '0'])/2)
+
+```
+
+```{r}
+#Bootstrap a distribution to get the SE:
+nof_bootstraps = 10^4
+total_size = 4 * nof_bootstraps
+effect_size_boot = rep(NA, total_size)
+
+for (i in 0:nof_bootstraps){
+  rows = sample(1:nrow(base_df), replace = TRUE)
+  sample_ = base_df[rows,] %>%
+    summarise(mean_geno = mean(Aggression_score)) %>%
+    group_by(id) %>%
+    spread(genotype, mean_geno)
+  
+  
+  sample_effect_size = as.list((sample_['2'] - sample_['0'] ) / 2)[[1]]
+  
+  effect_size_boot[seq(i*4 + 1, i*4+4, 1)] = sample_effect_size
+#  if(i%%(nof_bootstraps/50)==0) {   # Progress tracker
+#    cat(i, "\n")       
+#    flush.console()
+#  }
+}
+summary(effect_size_boot)
+write_lines(effect_size_boot, "../datasets/effect_size_boot")
+
+
+ggplot() + geom_density(mapping = aes(effect_size_boot))
+SE = sd(effect_size_boot) / sqrt(total_size)
+
+```
+
+
+```{r}
+# * make a graph comparing the distribution of aggression scores within each group defined by genotype. 
+
+box_plot = QTL_df %>% filter(genotype == '0' | genotype == '2') %>%
+  ggplot() + geom_boxplot(mapping = aes(genotype, Aggression_score)) +
+  facet_grid(~id) + coord_flip()
+
+density_plot = QTL_df %>% filter(genotype == '0' | genotype == '2') %>%
+  ggplot() + geom_density(mapping = aes(Aggression_score, color = genotype)) +
+  facet_grid(~id) + theme(legend.position="bottom")
+
+multiplot(box_plot, density_plot)
+```
+
+
+>Q4. Testing if there is an association between SNPs and the aggression score or level
+
+Now you are familiar with the overall distribution of the aggression scores and how the data is also distributed between groups (groups being defined by genotypes at a given SNP). 
+
+Based on that knowledge: 
+
+* choose (and justify your choice) a method to test if there is a significant association between the SNP genotype and the aggression score or level for each SNP.
+* apply this method and show your results
+* explain and conclude on the results of your analysis
+
+You are free to chose whether your will use the aggression score or the aggression level as the "aggression" variable.
+
+Answer:
+
+I've choosen to test the association between SNP genotype and agression score using linear models.
+This is because, as we can see in the previous graphs, it is the interraction between genotype and specific SNP which affects the agression score.
+We can see this in the following plots (and Anova test results)
+
+
+```{r}
+
+id_plot = QTL_df %>% filter(genotype == '0' | genotype == '2') %>%
+  ggplot() + geom_boxplot(mapping = aes(id, Aggression_score))
+
+geno_plot = QTL_df %>% filter(genotype == '0' | genotype == '2') %>%
+  ggplot() + geom_boxplot(mapping = aes(genotype, Aggression_score))
+
+multiplot(id_plot, geno_plot)
+```
+
+As you can see, there is not much variation when taking the individual SNP or genotypes. But there is an interraction between the two which affects the aggression score, as it can be seen by the results from the following Anova tests:
+
+H0 = There is no association between genotype*SNP and Aggression_score
+Ha = there is association between genotype*SNP and Aggression_score
+
+```{r}
+
+library(car)
+
+id_to_int = function (id) {
+  ifelse(id == '3L_14313095_SNP', 0, ifelse(id == '3L_9132740_SNP', 1, ifelse(id == '3L_10922119_SNP', 2, 3)))
+}
+
+test_df = QTL_df[c('Aggression_score', 'genotype', 'id')] %>%
+  filter(genotype == '0' | genotype == '2') %>% 
+  mutate(geno_int = as.integer(genotype), id_int = id_to_int(id))
+
+Anova(lm(Aggression_score ~ geno_int + id_int, data = test_df), type = "III")
+Anova(lm(Aggression_score ~ geno_int * id_int, data = test_df), type = "III")
+```
+
+As you can see, the first Anova test (without interraction) accepts the null Hypothesis as expected. But when the interraction term geno_int * id_int is added, the null hypothesis can be rejected due to a small value of P. 
+Therefore we can conclude that there actually is an association between genotypes SNPs and the Aggression levels.
+
+
+**IMPORTANT: Make sure you read the upload instructions at the top of this document!!!**
+
+# Merry Xmas to you all!
+
+
+
+
+

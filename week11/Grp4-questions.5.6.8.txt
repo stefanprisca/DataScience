@@ -1,0 +1,60 @@
+
+Q1: The chi-sqared GOF test compares the frequency distribution of a discrete or categorical variable with the...
+
+a: frequencies of a NULL disribution
+b: random generated freqiencies of a normal distribution
+c: freqiencies expected from a probability model
+
+
+Q2: What are the assumptions of Chi2 test?
+a) Continuous sample of the population
+b) Each cell has a count greater than 1
+c) At most 20% of the cells have expected values > 5
+d) The data sample is random.
+
+Q3: In a poisson distribution, events have an equal probability of occuring in a time/space unit,
+and each event depends on the occurrence of the previous (events are not independent).
+a) True
+b) False
+
+Q4: The odds of success in contingency analysis represent the probability of there being a
+correlation between two categorical variables.
+a) True
+b) False
+
+Q5: The Chi2 contingency test makes it possible to...
+a) Compute the correlation between two categorical variables
+b) Test the null hypothesis that the correlation between two categorical variables is 0
+c) Test the null hypothesis that two categorical variables are independent
+d) Test the null hypothesis that two continuous variables are independent
+
+Q6: Fishers exact test for contingency is usefull when:
+a) The expected frequencies for Chi2 are mostly small, with over 20% being under 5.
+b) The value obtained by Chi2 does not give the result we want
+c) There are expected frequencies less than 1.
+d) We want to check the independence of three or more variables.
+
+Q7: A clinical trial is an experimental study involving
+a) Humans
+b) Monkeys
+c) Rats
+d) Frogs
+
+Q8: Experimental design is used to:
+a) Eliminate bias
+b) Increase standard deviation of the data
+c) Reduce sampling error
+d) Testing effects of one variable on another
+
+Q9: Fisher's exact test calculates an exact p-value for the test of indepencence of two variables in a 3 X 3 table.
+
+a: TRUE
+b: FALSE
+
+Q10: BLocking in a clinical trail is...
+
+a: when the study is carried out on multiple independent participants
+b: when participants are grouped according to the clinic they attended
+c: when the study includes both the treatment of interest and a control group
+d: when the study groups the factors to make an equal baseline
+
