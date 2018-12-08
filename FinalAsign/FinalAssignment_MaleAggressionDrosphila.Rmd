@@ -150,14 +150,18 @@ pheno_ord$lineid = matrix(unlist(tmp), ncol=2, byrow=TRUE)[,2]
 pheno_cuts = cut(pheno_ord$lineid_n, seq(0, 1000, 150))
 pheno_ord['bin_id'] = pheno_cuts
 
-point_plot = ggplot(pheno_ord) + geom_point(mapping= aes(lineid_n, aggression_score)) + ggtitle('Aggression Scores per Line')
+ggplot(pheno_ord) + geom_point(mapping= aes(lineid_n, aggression_score)) + ggtitle('Aggression Scores per Line')
   
-box_plot = ggplot(pheno_ord) + geom_boxplot(mapping = aes(bin_id, aggression_score)) + ggtitle('Aggression Scores Boxplot')
-
-multiplot(point_plot, box_plot)
-
+ggplot(pheno_ord) + geom_boxplot(mapping = aes(bin_id, aggression_score)) + ggtitle('Summarised Aggression Scores per Line')
 ```
 The agression over line number has a relatively continuous distribution. This can be seen both in the point plot, and in the box plot.
+
+Looking at the probability distribution of agression scores, we can notice a skewed distribution. Most lines seem to have lower agression scores.
+There are however some outliers and the right tail is pretty long, showing high agression scores for some lines.
+
+```{r}
+ggplot(pheno_ord) + geom_histogram(mapping = aes(aggression_score), bins = 100) + ggtitle('Probability distrbution of Aggression Scores')
+```
 
 
 >Q2. Preparing the data 
@@ -191,7 +195,7 @@ Read in the DRGP genotypes data (dgrp2.tgeno.zip) and build a new dataframe that
 
 End by showing the first lines of your data frame using head()
 
-```{r}
+```
 #Reading the data...
 
 wanted_snps = c('3L_14313095_SNP', '3L_9132740_SNP', '3L_10922119_SNP', '3L_10922120_SNP')
@@ -240,7 +244,8 @@ cat_aggr = function(aggression) {
 }
 
 QTL_df = QTL_df %>% mutate(Aggression_level = cat_aggr(Aggression_score))
-
+keeps = c('genotype', 'id', 'Aggression_score', 'Aggression_level' )
+QTL_df = QTL_df[, keeps]
 head(QTL_df)
 ```
 
@@ -275,38 +280,48 @@ EffectSize_df = base_df %>%
   summarise(mean_geno = mean(Aggression_score)) %>%
   group_by(id) %>%
   mutate(effect_size = (mean_geno[genotype == '2'] - mean_geno[genotype == '0'])/2)
-
+EffectSize_df = EffectSize_df[,c('id','effect_size')] %>% unique()
 ```
 
-```{r}
+```
 #Bootstrap a distribution to get the SE:
 nof_bootstraps = 10^4
 total_size = 4 * nof_bootstraps
-effect_size_boot = rep(NA, total_size)
+effect_size_boot = EffectSize_df
 
 for (i in 0:nof_bootstraps){
   rows = sample(1:nrow(base_df), replace = TRUE)
   sample_ = base_df[rows,] %>%
     summarise(mean_geno = mean(Aggression_score)) %>%
-    group_by(id) %>%
-    spread(genotype, mean_geno)
+    group_by(id)
   
   
-  sample_effect_size = as.list((sample_['2'] - sample_['0'] ) / 2)[[1]]
-  
-  effect_size_boot[seq(i*4 + 1, i*4+4, 1)] = sample_effect_size
-#  if(i%%(nof_bootstraps/50)==0) {   # Progress tracker
-#    cat(i, "\n")       
-#    flush.console()
-#  }
+  sample_effect_size = sample_ %>% 
+    mutate(effect_size = (mean_geno[genotype == '2'] - mean_geno[genotype == '0'])/2)
+  sample_effect_size = sample_effect_size[,c('id','effect_size')] %>% unique()
+  effect_size_boot = merge(effect_size_boot, sample_effect_size,  all = TRUE)
+  if(i%%(nof_bootstraps/50)==0) {   # Progress tracker
+    cat(i, "\n")       
+    flush.console()
+  }
 }
 summary(effect_size_boot)
-write_lines(effect_size_boot, "../datasets/effect_size_boot")
+write_csv(effect_size_boot, "../datasets/effect_size_boot")
+```
 
+```{r}
+effect_size_boot = read_csv("../datasets/effect_size_boot")
+ggplot(effect_size_boot) + geom_density(mapping = aes(effect_size)) +
+  facet_wrap(~id)
 
-ggplot() + geom_density(mapping = aes(effect_size_boot))
-SE = sd(effect_size_boot) / sqrt(total_size)
+SE = effect_size_boot %>% 
+  group_by(id) %>%
+  summarise(SD = sd(effect_size))
+```
 
+The computed standard error is then:
+```{r}
+SE
 ```
 
 
@@ -358,6 +373,7 @@ multiplot(id_plot, geno_plot)
 As you can see, there is not much variation when taking the individual SNP or genotypes. But there is an interraction between the two which affects the aggression score, as it can be seen by the results from the following Anova tests:
 
 H0 = There is no association between genotype*SNP and Aggression_score
+
 Ha = there is association between genotype*SNP and Aggression_score
 
 ```{r}
@@ -378,6 +394,18 @@ Anova(lm(Aggression_score ~ geno_int * id_int, data = test_df), type = "III")
 
 As you can see, the first Anova test (without interraction) accepts the null Hypothesis as expected. But when the interraction term geno_int * id_int is added, the null hypothesis can be rejected due to a small value of P. 
 Therefore we can conclude that there actually is an association between genotypes SNPs and the Aggression levels.
+This can be double checked by generating a NULL sample distribution (via permutations) for the data. Then the slopes of the fit can be compared with the observed slope and see if there is indeed correlation or not.
+
+
+Another option is to use a non-parametric spearman test and taking each SNP individually.
+```{r}
+
+test_df %>%
+  group_by(id) %>%
+  summarise(p_val = cor.test(Aggression_score, geno_int, method = 'spearman')$p.value)
+
+```
+This again results in low p values, so we can reject the null hypothesis.
 
 
 **IMPORTANT: Make sure you read the upload instructions at the top of this document!!!**
